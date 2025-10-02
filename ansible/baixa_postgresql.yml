@@ -1,0 +1,70 @@
+---
+- name: Subir container PostgreSQL (Windows + Docker Desktop)
+  hosts: windows
+  gather_facts: false
+
+  vars:
+    pg_name: postgres
+    pg_user: "postgres"
+    pg_db: "postgres"
+    pg_image: postgres:18
+    pg_port: "5432:5432"
+    pg_password: "postgres"
+
+  tasks:
+    # 1) Esperar o Docker ficar pronto
+    - name: Aguardar Docker responder
+      win_command: docker info
+      register: docker_info
+      retries: 20
+      delay: 6
+      until: docker_info.rc == 0
+      changed_when: false
+
+    # 2) Garantir imagem presente
+    - name: Verificar imagem {{ pg_image }}
+      win_command: docker image inspect {{ pg_image }}
+      register: img_check
+      changed_when: false
+      failed_when: false
+
+    - name: Pull da imagem {{ pg_image }} (se faltar)
+      win_command: docker pull {{ pg_image }}
+      when: img_check.rc != 0
+
+    # 3) Verificar se o container já existe
+    - name: Checar existência do container {{ pg_name }}
+      win_command: powershell.exe -NoLogo -NonInteractive -Command "(docker ps -a --filter 'name=^/{{ pg_name }}$' --format '{{'{{'}}.Names{{'}}'}}')"
+      register: ct_exists
+      changed_when: false
+
+    # 4) Criar se não existir
+    - name: Criar container {{ pg_name }} (restart=always)
+      win_command: >
+        docker run -d --name {{ pg_name }}
+        --restart=always
+        -e POSTRES_DB={{ pg_db }}
+        -e POSTGRES_USER={{ pg_user }}
+        -e POSTGRES_PASSWORD={{ pg_password }}
+        -p {{ pg_port }}
+        {{ pg_image }}
+      when: ct_exists.stdout | trim == ""
+
+    # 5) Garantir restart policy = always (idempotente)
+    - name: Ajustar restart policy para always
+      win_command: docker update --restart=always {{ pg_name }}
+      changed_when: "'RestartPolicy' in (restart_out.stdout | default(''))"
+      register: restart_out
+      failed_when: false
+
+    # 6) Garantir que está rodando
+    - name: Verificar estado de execução
+      win_command: docker inspect -f "{{'{{'}}.State.Running{{'}}'}}" {{ pg_name }}
+      register: running
+      changed_when: false
+      failed_when: false
+
+    - name: Iniciar container se parado
+      win_command: docker start {{ pg_name }}
+      when: running.stdout | lower != "true"
+

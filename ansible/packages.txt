@@ -1,0 +1,8 @@
+chocolatey
+git
+jasp
+R.studio
+R
+rtools
+dbeaver
+python
