@@ -1,0 +1,143 @@
+---
+- name: WSL2, Docker Desktop, pacotes Chocolatey e PostgreSQL
+  hosts: windows
+  gather_facts: false
+
+  vars:
+    # ---- Pacotes / Docker ----
+    docker_package: docker-desktop
+    packages_file: "./packages.txt"
+    choco_packages: >-
+      {{
+        lookup('file', packages_file)
+        .splitlines()
+        | map('trim')
+        | reject('match', '^#')
+        | reject('equalto', '')
+        | list
+      }}
+
+    # ---- PostgreSQL ----
+    pg_name: postgres
+    pg_user: "postgres"
+    pg_db: "postgres"
+    pg_image: postgres:18
+    pg_port: "5432:5432"
+    pg_password: "postgres"
+
+  tasks:
+    # ---------- WSL2 ----------
+    - name: Habilitar "Windows Subsystem for Linux"
+      win_optional_feature:
+        name: Microsoft-Windows-Subsystem-Linux
+        state: present
+        include_parent: yes
+      register: wsl1
+      tags: [wsl]
+
+    - name: Habilitar "VirtualMachinePlatform" (WSL2)
+      win_optional_feature:
+        name: VirtualMachinePlatform
+        state: present
+        include_parent: yes
+      register: vmp
+      tags: [wsl]
+
+    - name: Reboot se necessário (após habilitar WSL/VirtualMachinePlatform)
+      win_reboot:
+      when: (wsl1.reboot_required | default(false)) or (vmp.reboot_required | default(false))
+      tags: [wsl]
+
+    - name: Definir WSL2 como versão padrão (idempotente)
+      win_command: wsl.exe --set-default-version 2
+      register: wsl_default_v2
+      changed_when: false
+      failed_when: wsl_default_v2.rc != 0
+      tags: [wsl]
+
+    - name: Atualizar kernel do WSL (ignorar erro se não suportado)
+      win_command: wsl.exe --update
+      register: wsl_update
+      changed_when: false
+      failed_when: false
+      tags: [wsl]
+
+    # ---------- Chocolatey ----------
+    - name: Garantir Chocolatey presente
+      win_chocolatey:
+        name: chocolatey
+        state: present
+      tags: [choco]
+
+    # ---------- Docker Desktop ----------
+    - name: Instalar/atualizar Docker Desktop
+      win_chocolatey:
+        name: "{{ docker_package }}"
+        state: present
+      tags: [docker]
+
+    - name: Esperar Docker responder (Docker Desktop subir)
+      win_command: docker info
+      register: docker_info
+      retries: 20
+      delay: 6
+      until: docker_info.rc == 0
+      changed_when: false
+      tags: [docker]
+
+    # ---------- Pacotes extras via packages.txt ----------
+    - name: Instalar pacotes do packages.txt
+      win_chocolatey:
+        name: "{{ choco_packages }}"
+        state: present
+      tags: [packages, choco]
+
+    # ---------- PostgreSQL via Docker ----------
+    - name: Verificar se imagem {{ pg_image }} já existe
+      win_command: docker image inspect {{ pg_image }}
+      register: img_check
+      changed_when: false
+      failed_when: false
+      tags: [postgres, docker]
+
+    - name: Fazer pull da imagem {{ pg_image }} se faltar
+      win_command: docker pull {{ pg_image }}
+      when: img_check.rc != 0
+      tags: [postgres, docker]
+
+    - name: Checar se o container {{ pg_name }} existe
+      win_command: powershell.exe -NoLogo -NonInteractive -Command "(docker ps -a --filter 'name=^/{{ pg_name }}$' --format '{{'{{'}}.Names{{'}}'}}')"
+      register: ct_exists
+      changed_when: false
+      tags: [postgres]
+
+    - name: Criar container {{ pg_name }} (restart=always) se não existir
+      win_command: >
+        docker run -d --name {{ pg_name }}
+        --restart=always
+        -e POSTGRES_DB={{ pg_db }}
+        -e POSTGRES_USER={{ pg_user }}
+        -e POSTGRES_PASSWORD={{ pg_password }}
+        -p {{ pg_port }}
+        {{ pg_image }}
+      when: ct_exists.stdout | trim == ""
+      tags: [postgres]
+
+    - name: Garantir restart policy "always" (idempotente)
+      win_command: docker update --restart=always {{ pg_name }}
+      changed_when: false
+      failed_when: false
+      tags: [postgres]
+
+    - name: Verificar estado de execução do container
+      win_command: docker inspect -f "{{'{{'}}.State.Running{{'}}'}}" {{ pg_name }}
+      register: running
+      changed_when: false
+      failed_when: false
+      tags: [postgres]
+
+    - name: Iniciar container se parado
+      win_command: docker start {{ pg_name }}
+      when: running.stdout | lower != "true"
+      tags: [postgres, docker, start]
+
