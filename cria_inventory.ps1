@@ -4,7 +4,7 @@ $nic       = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and 
 $localIP   = $nic.IPv4Address.IPAddress
 $Port      = 2313
 $scriptDir = Split-Path -Parent -Path $MyInvocation.MyCommand.Path
-$inventoryPath = Join-Path $scriptDir "inventory.ini"
+$inventoryPath = Join-Path $scriptDir "ansible/inventory.ini"
 
 # Nome do host = winhost + último octeto do IP (ex.: 192.168.0.105 -> winhost105)
 $suffix = ($localIP -split '\.')[-1]
