@@ -1,2 +1,3 @@
 id_rsa.pub
 ansible/id_rsa
+ansible/instala_dependencias.sh

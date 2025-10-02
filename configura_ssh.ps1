@@ -20,7 +20,7 @@ param(
   [int]$Port = 2313
 )
 
-# ===== Verificações básicas =====
+Write-Host "# ===== Verificações básicas ====="
 If (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
    ).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
   Write-Error "Abra o PowerShell com **Executar como Administrador**."
@@ -36,7 +36,7 @@ if (-not (Test-Path $pubKeySrc)) {
   exit 1
 }
 
-# ===== Helpers =====
+Write-Host "# ===== Configurando Helpers ====="
 function Test-IsUserInAdmins([string]$U){
   try {
     $adminsLocal = @("Administradores","Administrators")
@@ -54,11 +54,15 @@ function Set-StrictAcl-AdminsOnly([string]$Path){
   icacls $Path /inheritance:r | Out-Null
   # Dono = Administradores/Administrators
   $set = $false
-  try { icacls $Path /setowner Administradores  | Out-Null; $set = $true } catch {}
-  if (-not $set){ icacls $Path /setowner Administrators | Out-Null }
-  # Permissões
-  icacls $Path /grant:r "Administradores:(F)" "NT AUTHORITY\SYSTEM:(F)" 2>$null | Out-Null
-  icacls $Path /grant:r "Administrators:(F)" "NT AUTHORITY\SYSTEM:(F)" 2>$null | Out-Null
+  try { 
+    icacls $Path /setowner Administradores  | Out-Null; $set = $true 
+    icacls $Path /grant:r "Administradores:(F)" "NT AUTHORITY\SYSTEM:(F)" 2>$null | Out-Null
+  } catch {}
+  if (-not $set){ 
+    icacls $Path /setowner Administrators | Out-Null 
+    icacls $Path /grant:r "Administrators:(F)" "NT AUTHORITY\SYSTEM:(F)" 2>$null | Out-Null   
+  }
+
   foreach($sid in @('Todos','Usuários','Users','Authenticated Users','INTERACTIVE','Everyone')){
     icacls $Path /remove:g $sid 2>$null | Out-Null
   }
@@ -74,7 +78,7 @@ function Set-StrictAcl-UserOnly([string]$Path,[string]$User){
   }
 }
 
-# ===== Instalar/ativar OpenSSH Server (checagem rápida) =====
+Write-Host "# ===== Instalar/ativar OpenSSH Server (checagem rápida) ====="
 if (-not (Get-Service sshd -ErrorAction SilentlyContinue)) {
   Write-Host "Instalando OpenSSH.Server..." -ForegroundColor Cyan
   Add-WindowsCapability -Online -Name "OpenSSH.Server~~~~0.0.1.0"
@@ -85,14 +89,14 @@ Set-Service -Name ssh-agent -StartupType Automatic
 if ((Get-Service ssh-agent).Status -ne "Running"){ Start-Service ssh-agent }
 if ((Get-Service sshd).Status -ne "Running"){ Start-Service sshd }
 
-# ===== Caminhos =====
+Write-Host "# ===== Caminhos ====="
 $sshProgData = "C:\ProgramData\ssh"
 New-Item -ItemType Directory -Path $sshProgData -Force | Out-Null
 $sshdConfig  = Join-Path $sshProgData "sshd_config"
 $authAdmin   = Join-Path $sshProgData "administrators_authorized_keys"
 
-# Perfil do usuário alvo
-# Tenta achar o perfil exato; se não achar, assume C:\Users\<UserName>
+Write-Host "# Verificando Perfil do usuário alvo"
+Write-Host "# Tenta achar o perfil exato; se não achar, assume C:\Users\<UserName>"
 $userProfile = (Get-CimInstance Win32_UserProfile -ErrorAction SilentlyContinue |
   Where-Object { $_.LocalPath -match "\\Users\\$([Regex]::Escape($UserName))$" } |
   Select-Object -First 1).LocalPath
@@ -101,7 +105,7 @@ if (-not $userProfile){ $userProfile = "C:\Users\$UserName" }
 $userSshDir  = Join-Path $userProfile ".ssh"
 $userAuth    = Join-Path $userSshDir "authorized_keys"
 
-# ===== Copiar chave pública =====
+Write-Host "# ===== Copiar chave pública ====="
 $keyLine = (Get-Content -LiteralPath $pubKeySrc -Raw).Trim()
 
 $targetIsAdminsFile = Test-IsUserInAdmins -U $UserName
@@ -116,22 +120,22 @@ if ($targetIsAdminsFile) {
   Set-StrictAcl-UserOnly -Path $userAuth -User $UserName
 }
 
-# (opcional) “endurece” a própria id_rsa.pub do diretório
-try {
-  icacls $privateKeySrc /inheritance:r | Out-Null
-  $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-  icacls $privateKeySrc /setowner "$me" | Out-Null
-  icacls $privateKeySrc /grant:r "${me}:(R)" "NT AUTHORITY\SYSTEM:(F)" | Out-Null
-  foreach($sid in @('Todos','Usuários','Users','Authenticated Users','INTERACTIVE','Everyone','Administradores','Administrators')){
-    icacls $privateKeySrc /remove:g $sid 2>$null | Out-Null
-  }
-} catch { }
+#Write-Host "# endurece a própria id_rsa.pub do diretório"
+#try {
+#  icacls $privateKeySrc /inheritance:r | Out-Null
+#  $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+#  icacls $privateKeySrc /setowner "$me" | Out-Null
+#  icacls $privateKeySrc /grant:r "${me}:(R)" "NT AUTHORITY\SYSTEM:(F)" | Out-Null
+#  foreach($sid in @('Todos','Usuários','Users','Authenticated Users','INTERACTIVE','Everyone','Administradores','Administrators')){
+#    icacls $privateKeySrc /remove:g $sid 2>$null | Out-Null
+#  }
+#} catch { }
 
-# ===== Ajustar sshd_config =====
+Write-Host "# ===== Ajustar sshd_config ====="
 if (-not (Test-Path $sshdConfig)){ New-Item -ItemType File -Path $sshdConfig -Force | Out-Null }
 $config = Get-Content -LiteralPath $sshdConfig -Raw
 
-# limpa diretivas antigas (modo multiline via (?m))
+Write-Host "# limpa diretivas antigas (modo multiline via (?m))"
 $config = $config -replace '(?m)^[#\s]*Port\s+\d+.*$', ''
 $config = $config -replace '(?m)^[#\s]*AddressFamily\s+\w+.*$', ''
 $config = $config -replace '(?m)^[#\s]*ListenAddress\s+.*$', ''
@@ -156,40 +160,20 @@ $matchBlock = @(
 $newConfig = $head + "`r`n" + $config.Trim() + $matchBlock
 Set-Content -LiteralPath $sshdConfig -Value ($newConfig.Trim() + "`r`n") -Encoding ascii
 
-# ===== Firewall =====
+Write-Host "# ===== Firewall ====="
 $fwRuleName = "OpenSSH Server (sshd) - TCP $Port"
 $old = Get-NetFirewallRule -DisplayName $fwRuleName -ErrorAction SilentlyContinue
 if ($old){ $old | Remove-NetFirewallRule }
 New-NetFirewallRule -DisplayName $fwRuleName -Direction Inbound -Action Allow `
   -Protocol TCP -LocalPort $Port -Profile Any | Out-Null
 
-# ===== Aplicar e validar =====
+Write-Host "# ===== Aplicar e validar SSH====="
 Restart-Service sshd
 
-# Sanity check: confirmar AuthorizedKeysFile efetivo
+Write-Host "# Sanity check: confirmar AuthorizedKeysFile efetivo"
 $authList = & 'C:\Windows\System32\OpenSSH\sshd.exe' -T 2>$null | Select-String -Pattern 'authorizedkeysfile'
 Write-Host "`nAuthorizedKeysFile efetivo:" -ForegroundColor Cyan
 $authList | ForEach-Object { $_.ToString() } | Write-Host
 
-# ===== Inventory Ansible =====
-$nic = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.IPv4Address } | Select-Object -First 1
-$localIP = $nic.IPv4Address.IPAddress
-if (-not $localIP) {
-  $localIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -ne "127.0.0.1" } | Select-Object -First 1).IPAddress
-}
-$inventory = @"
-[windows]
-winhost ansible_host=$localIP ansible_port=$Port ansible_user=$UserName ansible_connection=ssh
 
-[windows:vars]
-ansible_ssh_private_key_file=~/.ssh/id_rsa
-ansible_shell_type=powershell
-"@
-$inventoryPath = Join-Path $scriptDir "inventory_$localIP.ini"
-Set-Content -LiteralPath $inventoryPath -Value $inventory -Encoding ascii
-
-Write-Host "`nPronto! ✅" -ForegroundColor Green
-Write-Host "Teste local:" -ForegroundColor Cyan
-Write-Host "  ssh -p $Port `"$UserName`"@localhost -vvv" -ForegroundColor Gray
-Write-Host "Inventory criado em: $inventoryPath" -ForegroundColor Gray
 
