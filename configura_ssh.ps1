@@ -185,10 +185,11 @@ winhost ansible_host=$localIP ansible_port=$Port ansible_user=$UserName ansible_
 ansible_ssh_private_key_file=~/.ssh/id_rsa
 ansible_shell_type=powershell
 "@
-$inventoryPath = Join-Path $scriptDir "inventory.ini"
+$inventoryPath = Join-Path $scriptDir "inventory_$localIP.ini"
 Set-Content -LiteralPath $inventoryPath -Value $inventory -Encoding ascii
 
 Write-Host "`nPronto! ✅" -ForegroundColor Green
 Write-Host "Teste local:" -ForegroundColor Cyan
 Write-Host "  ssh -p $Port `"$UserName`"@localhost -vvv" -ForegroundColor Gray
 Write-Host "Inventory criado em: $inventoryPath" -ForegroundColor Gray
+
