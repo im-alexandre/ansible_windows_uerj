@@ -1,0 +1,140 @@
+# playbooks/postgres_windows.yml
+- name: Instalar e configurar PostgreSQL no Windows (Chocolatey)
+  hosts: windows
+  gather_facts: no
+  vars:
+    pg_version: "16"                           # ajuste se quiser outra
+    pg_package: "postgresql"                   # pacote do choco (usa versão mais recente disponível)
+    pg_port: 5432
+    pg_root: "C:\\Program Files\\PostgreSQL\\{{ pg_version }}"
+    pg_bin:  "{{ pg_root }}\\bin"
+    pg_data: "C:\\PostgresData\\data"
+    pg_service: "postgresql-x64-{{ pg_version }}"
+    # "variáveis estilo Docker":
+    POSTGRES_USER: "appuser"
+    POSTGRES_PASSWORD: "appsecret"
+    POSTGRES_DB: "appdb"
+    POSTGRES_SUPER_PASS: "postgres_secret"     # senha do superusuário 'postgres'
+    # controle temporário de hba: 'trust' para setar senha e depois 'md5'
+    hba_auth_final: "md5"
+
+  tasks:
+    - name: Garantir Chocolatey instalado
+      community.windows.win_chocolatey:
+        state: present
+
+    - name: Instalar PostgreSQL via Chocolatey
+      community.windows.win_chocolatey:
+        name: "{{ pg_package }}"
+        state: present
+      register: choco_pg
+
+    - name: Criar diretório de dados
+      ansible.windows.win_file:
+        path: "{{ pg_data }}"
+        state: directory
+
+    - name: Detectar se cluster já foi inicializado
+      ansible.windows.win_stat:
+        path: "{{ pg_data }}\\PG_VERSION"
+      register: pgversion_file
+
+    - name: Inicializar cluster (initdb) se faltar
+      ansible.windows.win_shell: |
+        "{{ pg_bin }}\\initdb.exe" -D "{{ pg_data }}" -U postgres -A trust
+      when: not pgversion_file.stat.exists
+
+    - name: Escrever postgresql.conf (porta e diretórios)
+      ansible.windows.win_template:
+        dest: "{{ pg_data }}\\postgresql.conf"
+        # template inline:
+        content: |
+          data_directory = '{{ pg_data | replace('\\','/') }}'
+          hba_file = '{{ pg_data | replace('\\','/') }}/pg_hba.conf'
+          ident_file = '{{ pg_data | replace('\\','/') }}/pg_ident.conf'
+          port = {{ pg_port }}
+          listen_addresses = '127.0.0.1'        # ajuste se precisar expor
+          max_connections = 100
+          # demais parâmetros padrão...
+
+    - name: Escrever pg_hba.conf TEMPORÁRIO (trust local para setar senha)
+      ansible.windows.win_template:
+        dest: "{{ pg_data }}\\pg_hba.conf"
+        content: |
+          # TYPE  DATABASE        USER            ADDRESS                 METHOD
+          local   all             all                                     trust
+          host    all             all             127.0.0.1/32            trust
+          host    all             all             ::1/128                 trust
+
+    - name: Registrar serviço (se ainda não existir)
+      ansible.windows.win_shell: |
+        if (-not (Get-Service -Name "{{ pg_service }}" -ErrorAction SilentlyContinue)) {
+          & "{{ pg_bin }}\\pg_ctl.exe" register -N "{{ pg_service }}" -D "{{ pg_data }}"
+        }
+      args:
+        executable: powershell.exe
+
+    - name: Iniciar (ou reiniciar) serviço
+      ansible.windows.win_service:
+        name: "{{ pg_service }}"
+        state: restarted
+        start_mode: auto
+
+    - name: Definir senha do superusuário postgres
+      ansible.windows.win_shell: |
+        & "{{ pg_bin }}\\psql.exe" -U postgres -h 127.0.0.1 -p {{ pg_port }} -d postgres -c "ALTER USER postgres WITH PASSWORD '{{ POSTGRES_SUPER_PASS }}';"
+      args:
+        executable: powershell.exe
+
+    - name: Criar usuário da aplicação (se não existir)
+      ansible.windows.win_shell: |
+        $sql = @"
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='{{ POSTGRES_USER }}') THEN
+            CREATE ROLE "{{ POSTGRES_USER }}" LOGIN PASSWORD '{{ POSTGRES_PASSWORD }}';
+          END IF;
+        END$$;
+        "@
+        & "{{ pg_bin }}\\psql.exe" -U postgres -h 127.0.0.1 -p {{ pg_port }} -d postgres -c $sql
+      args:
+        executable: powershell.exe
+
+    - name: Criar database da aplicação (se não existir) e ownership
+      ansible.windows.win_shell: |
+        $sql = @"
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT FROM pg_database WHERE datname='{{ POSTGRES_DB }}') THEN
+            CREATE DATABASE "{{ POSTGRES_DB }}" OWNER "{{ POSTGRES_USER }}";
+          END IF;
+        END$$;
+        "@
+        & "{{ pg_bin }}\\psql.exe" -U postgres -h 127.0.0.1 -p {{ pg_port }} -d postgres -c $sql
+      args:
+        executable: powershell.exe
+
+    - name: Escrever pg_hba.conf DEFINITIVO (md5 por padrão)
+      ansible.windows.win_template:
+        dest: "{{ pg_data }}\\pg_hba.conf"
+        content: |
+          # TYPE  DATABASE        USER            ADDRESS                 METHOD
+          local   all             all                                     {{ hba_auth_final }}
+          host    all             all             127.0.0.1/32            {{ hba_auth_final }}
+          host    all             all             ::1/128                 {{ hba_auth_final }}
+
+    - name: Reiniciar serviço após hba final
+      ansible.windows.win_service:
+        name: "{{ pg_service }}"
+        state: restarted
+
+    - name: Abrir porta no Firewall do Windows (perfil Any)
+      ansible.windows.win_firewall_rule:
+        name: "PostgreSQL {{ pg_port }}"
+        localport: "{{ pg_port }}"
+        action: allow
+        direction: in
+        protocol: tcp
+        state: present
+        enabled: yes
+        profiles: Any
