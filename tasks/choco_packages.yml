@@ -1,0 +1,46 @@
+---
+- name: Garantindo que o diretório existe
+  win_file:
+    path: "{{ remote_temp }}"
+    state: directory
+  tags: [packages,choco]
+
+- name: Copiar arquivo packages.txt
+  win_copy:
+    src: "{{ packages_file }}"
+    dest: "{{ remote_packages_file }}"
+  tags: [packages,choco]
+
+- name: Ler lista de pacotes
+  win_shell: |
+    Get-Content {{ remote_packages_file }} |
+      Where-Object { $_.Trim() -ne "" -and -not ($_.Trim().StartsWith("#")) }
+  register: pkglist
+  tags: [packages,choco]
+
+- name: Instalar pacotes com versão explícita (linhas com "=")
+  win_chocolatey:
+    name: "{{ item.split('=')[0] }}"
+    version: "{{ item.split('=')[1] }}"
+    state: upgrade
+    allow_prerelease: no
+    force: yes
+  ignore_errors: true
+  loop: "{{ pkglist.stdout_lines }}"
+  when: "'=' in item"
+  tags: [packages,choco,versao]
+
+- name: Instalar pacotes sem versão (pega última estável)
+  win_chocolatey:
+    name: "{{ item }}"
+    state: present
+    allow_prerelease: no
+  loop: "{{ pkglist.stdout_lines }}"
+  when: "'=' not in item"
+  tags: [packages, choco]
+
+- name: Removento o packages.txt
+  win_file:
+    path: "{{ remote_temp }}"
+    state: absent
+  tags: [packages,choco]

@@ -1,0 +1,33 @@
+---
+# site.yml — Playbook principal (único) com 2 plays
+# 1) Base: bootstrap do Chocolatey e instalação dos pacotes do packages.txt
+# 2) MySQL: Instalação e configuração do MySQL para usuario laboratorio
+
+- name: Base Windows | Chocolatey + Pacotes
+  hosts: laboratorio9003
+  gather_facts: no
+  vars:
+    packages_file: "{{ playbook_dir }}/packages.txt"
+    remote_temp: C:\temp_ansible
+    remote_packages_file: "{{ remote_temp }}\\packages.txt"
+  tasks:
+    - name: Preparar ambiente / pré-checagens
+      import_tasks: tasks/win_prep.yml
+
+    - name: Garantir Chocolatey instalado
+      import_tasks: tasks/choco_bootstrap.yml
+
+    - name: Instalar pacotes do packages.txt
+      import_tasks: tasks/choco_packages.yml
+
+- name: Instalar MySQL no Windows via Chocolatey e configurar root
+  hosts: laboratorio9003
+  gather_facts: no
+  vars:
+    mysql_root_password: "root"   # Defina a senha desejada
+    mysql_root_password_current: "{{ mysql_root_password }}"
+    mysql_root_password_new: "{{ mysql_root_password }}"
+  tasks:
+    - name: Instalar mysql
+      import_tasks: tasks/install_mysql.yml
+

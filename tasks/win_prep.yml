@@ -1,0 +1,4 @@
+---
+- name: Exibir máquina alvo (debug)
+  ansible.builtin.debug:
+    msg: "Alvo: {{ inventory_hostname }} ({{ ansible_host | default(inventory_hostname) }})"

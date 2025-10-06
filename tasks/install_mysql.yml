@@ -1,0 +1,74 @@
+---
+- name: Garantir que o Chocolatey esteja instalado
+  win_chocolatey:
+    name: chocolatey
+    state: present
+  tags: mysql
+
+- name: Matar processos relacionados ao mysqld
+  win_shell: |
+    Stop-Process -ProcessName mysqld -Force
+  ignore_errors: yes
+  tags: mysql
+
+- name: Matar processos relacionados ao admin
+  win_shell: |
+    Stop-Process -ProcessName mysqladmin -Force
+  ignore_errors: yes
+  tags: mysql
+
+- name: Deinstalar MySQL (community edition) via choco
+  win_chocolatey:
+    name: mysql
+    state: absent
+  tags: mysql
+
+- name: Remover diretório do MySQL
+  win_file:
+    path: "C:\\tools\\mysql"
+    state: absent
+  tags: mysql
+
+- name: Remover diretório de dados do MySQL
+  win_file:
+    path: "C:\\ProgramData\\MySQL"
+    state: absent
+  tags: mysql
+
+- name: Instalar MySQL (community edition) via choco
+  win_chocolatey:
+    name: mysql
+    state: present
+  tags: mysql
+
+- name: Definir senha do usuário root do MySQL
+  win_shell: |
+    & "C:\tools\mysql\current\bin\mysqladmin.exe" -u root password "{{ mysql_root_password }}"
+  tags: mysql
+
+- name: Criar Banco de dados para o Laboratório
+  win_shell: |
+    & mysql.exe `
+      -u root `
+      -p"{{ mysql_root_password }}" `
+      -e "CREATE DATABASE laboratorio CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+  no_log: true
+  tags: mysql
+
+
+- name: Criar Usuário para o Laboratório
+  win_shell: |
+    & mysql.exe `
+      -u root `
+      -p"{{ mysql_root_password }}" `
+      -e "CREATE USER 'laboratorio'@'localhost' IDENTIFIED BY 'laboratorio';"
+  no_log: true
+  tags: mysql
+
+- name: Resolvendo permissões
+  win_shell: |
+    & mysql.exe `
+      -u root `
+      -p"{{ mysql_root_password }}" `
+      -e "GRANT ALL PRIVILEGES ON laboratorio.* TO 'laboratorio'@'localhost'; FLUSH PRIVILEGES;"
+  tags: mysql
