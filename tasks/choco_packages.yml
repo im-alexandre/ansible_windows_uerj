@@ -70,3 +70,11 @@
     path: "{{ remote_temp }}"
     state: absent
   tags: [packages,choco]
+
+- name: Prepend no PATH (coloca {{ desired_dir }} no início)
+  community.windows.win_path:
+    elements:
+      - "C:\\tools\\Anaconda3\\python.exe"
+    scope: "{{ path_scope }}"      # 'machine' ou 'user'
+    state: present
+    position: prepend
