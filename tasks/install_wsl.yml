@@ -19,3 +19,18 @@
   ansible.windows.win_reboot:
   when: (feat_wsl.changed | default(false)) or (feat_vmp.changed | default(false))
   tags: wsl
+  
+- name: Instalar o WSL
+  win_shell: |
+        Start-Process -FilePath "wsl.exe" -ArgumentList "--install" -Wait -Verb RunAs
+  tags: wsl
+  
+- name: Definir WSL2 como padrão
+  win_shell: |
+        Start-Process -FilePath "wsl.exe" -ArgumentList "-set-default-version 2" -Wait -Verb RunAs
+ tags: wsl
+
+- name: Instalar a distribuição Ubuntu
+  win_shell: |
+        Start-Process -FilePath "wsl.exe" -ArgumentList "--install -d Ubuntu" -Wait -Verb RunAs
+  tags: wsl
