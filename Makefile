@@ -11,6 +11,7 @@ help:
 	@echo "  mysql     - executa install_mysql.yml (Instala o mysql)"
 	@echo "  wsl       - executa install_wsl.yml (Instala o wsl)"
 	@echo "  deploy    - executa site.yml (base + mysql)"
+	@echo "  packages  - instala apenas os pacotes em packages.txt"
 	@echo "  clean     - remove .venv e artefatos"
 	@echo ""
 	@echo ""
@@ -49,6 +50,13 @@ ifeq ($(env),)
 	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --skip-tags wsl
 else
 	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --skip-tags wsl
+endif
+
+packages:
+ifeq ($(env),)
+	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --tags packages,choco
+else
+	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --tags packages,choco
 endif
 
 wsl:

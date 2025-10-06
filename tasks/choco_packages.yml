@@ -25,16 +25,44 @@
     allow_prerelease: no
   ignore_errors: true
   loop: "{{ pkglist.stdout_lines }}"
-  when: "'=' in item"
+  when: 
+    - "'=' in item"
+    - "' ' not in item"
   tags: [packages,choco,versao]
 
 - name: Instalar pacotes sem versão (pega última estável)
   win_chocolatey:
-    name: "{{ item }}"
+    name: "{{ item.split(' ')[0] }}"
+    allow_prerelease: no
+  ignore_errors: true
+  loop: "{{ pkglist.stdout_lines }}"
+  when: 
+    - "'=' not in item" 
+    - "' ' not in item" 
+  tags: [packages,choco,parametros]
+
+- name: Instalar pacotes com Parâmetros e com versão
+  win_chocolatey:
+    name: "{{ item.split('=')[0] }}"
+    version: "{{ item.split(' ')[0].split('=') }}"
     state: present
     allow_prerelease: no
+    package_params: "{{ item.split(' ')[1:] | join(' ') }}"
+    force: true
   loop: "{{ pkglist.stdout_lines }}"
-  when: "'=' not in item"
+  when: 
+    - "' ' in item"
+    - "'=' in item"
+  tags: [packages, choco]
+
+- name: Instalar pacotes com Parâmetros e sem versão
+  win_chocolatey:
+    name: "{{ item.split(' ')[0] }}"
+    state: present
+    allow_prerelease: no
+    package_params: "{{ item.split(' ')[1:] | join(' ') }}"
+  loop: "{{ pkglist.stdout_lines }}"
+  when: "' ' in item"
   tags: [packages, choco]
 
 - name: Removento o packages.txt

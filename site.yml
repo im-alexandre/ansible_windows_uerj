@@ -8,7 +8,7 @@
   hosts: laboratorio9003
   gather_facts: no
   vars:
-    packages_file: "{{ playbook_dir }}/packages.txt"
+    packages_file: "{{ playbook_dir }}/{{ packages_list }}"
     remote_temp: C:\temp_ansible
     remote_packages_file: "{{ remote_temp }}\\packages.txt"
   tasks:

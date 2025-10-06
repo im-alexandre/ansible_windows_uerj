@@ -1,5 +1,5 @@
 vscode
-anaconda3
+anaconda3 /AddToPath /JustMe
 curl
 R
 R.Studio
