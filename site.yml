@@ -2,6 +2,7 @@
 # site.yml — Playbook principal (único) com 2 plays
 # 1) Base: bootstrap do Chocolatey e instalação dos pacotes do packages.txt
 # 2) MySQL: Instalação e configuração do MySQL para usuario laboratorio
+# 3) Instalação do wsl e ubuntu no windows
 
 - name: Base Windows | Chocolatey + Pacotes
   hosts: laboratorio9003
@@ -20,6 +21,15 @@
     - name: Instalar pacotes do packages.txt
       import_tasks: tasks/choco_packages.yml
 
+- name: Instalar WSL e Ubuntu no Windows
+  hosts: laboratorio9003
+  gather_facts: no
+  vars:
+    wsl_distro: Ubuntu
+  tasks:
+    - name: Instalar wsl
+      import_tasks: tasks/install_wsl.yml
+
 - name: Instalar MySQL no Windows via Chocolatey e configurar root
   hosts: laboratorio9003
   gather_facts: no
@@ -27,7 +37,9 @@
     mysql_root_password: "root"   # Defina a senha desejada
     mysql_root_password_current: "{{ mysql_root_password }}"
     mysql_root_password_new: "{{ mysql_root_password }}"
+    dbeaver_src: "data-sources.json"
+    dbeaver_dst_dir: "C:\\Users\\{{ ansible_user }}\\AppData\\Roaming\\DBeaverData\\workspace6\\General\\.dbeaver"
+    dbeaver_dst_file: "{{ dbeaver_dst_dir }}\\data-sources.json"
   tasks:
     - name: Instalar mysql
       import_tasks: tasks/install_mysql.yml
-

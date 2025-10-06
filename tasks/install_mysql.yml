@@ -72,3 +72,15 @@
       -p"{{ mysql_root_password }}" `
       -e "GRANT ALL PRIVILEGES ON laboratorio.* TO 'laboratorio'@'localhost'; FLUSH PRIVILEGES;"
   tags: mysql
+
+- name: Criar Diretório de Configurações do dbeaver
+  win_file:
+  path: "{{ dbeaver_dst_dir }}"
+  state: directory
+  tags: mysql
+
+- name: Copiar arquivo data-sources.json
+  ansible.windows.win_copy:
+    src: "{{ dbeaver_src }}"
+    dest: "{{ dbeaver_dst_file }}"
+  tags: mysql
