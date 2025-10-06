@@ -53,9 +53,9 @@ endif
 
 wsl:
 ifeq ($(env),)
-	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --skip-tags wsl
+	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --tags wsl
 else
-	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --skip-tags wsl
+	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --tags wsl
 endif
 
 mysql:

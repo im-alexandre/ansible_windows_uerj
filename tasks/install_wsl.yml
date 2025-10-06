@@ -1,29 +1,21 @@
 ---
-- name: Ativar recurso WSL
-  ansible.windows.win_feature:
+- name: Ativar recurso WSL (cliente Windows)
+  ansible.windows.win_optional_feature:
     name: Microsoft-Windows-Subsystem-Linux
     state: present
+    include_parent: yes
+  register: feat_wsl
   tags: wsl
 
-- name: Ativar recurso VirtualMachinePlatform
-  ansible.windows.win_feature:
+- name: Ativar recurso VirtualMachinePlatform (cliente Windows)
+  ansible.windows.win_optional_feature:
     name: VirtualMachinePlatform
     state: present
+    include_parent: yes
+  register: feat_vmp
   tags: wsl
 
-- name: Definir WSL 2 como padrão
-  ansible.windows.win_command:
-    command: wsl --set-default-version 2
-  tags: wsl
-
-- name: Instalar Ubuntu via winget
-  ansible.windows.win_command:
-    command: wsl --install -d {{ wsl_distro }}
-  register: ubuntu_install
-  failed_when: ubuntu_install.rc not in [0, 3010]
-  tags: wsl
-
-- name: Garantir que o Ubuntu está configurado como padrão
-  ansible.windows.win_command:
-    command: wsl --set-default {{ wsl_distro }}
+- name: Reboot se algum recurso foi alterado
+  ansible.windows.win_reboot:
+  when: (feat_wsl.changed | default(false)) or (feat_vmp.changed | default(false))
   tags: wsl

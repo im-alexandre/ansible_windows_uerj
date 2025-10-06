@@ -22,9 +22,7 @@
   win_chocolatey:
     name: "{{ item.split('=')[0] }}"
     version: "{{ item.split('=')[1] }}"
-    state: upgrade
     allow_prerelease: no
-    force: yes
   ignore_errors: true
   loop: "{{ pkglist.stdout_lines }}"
   when: "'=' in item"

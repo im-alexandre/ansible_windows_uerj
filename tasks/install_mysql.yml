@@ -10,12 +10,14 @@
     Stop-Process -ProcessName mysqld -Force
   ignore_errors: yes
   tags: mysql
+  no_log: true
 
 - name: Matar processos relacionados ao admin
   win_shell: |
     Stop-Process -ProcessName mysqladmin -Force
   ignore_errors: yes
   tags: mysql
+  no_log: true
 
 - name: Deinstalar MySQL (community edition) via choco
   win_chocolatey:
@@ -75,8 +77,8 @@
 
 - name: Criar Diretório de Configurações do dbeaver
   win_file:
-  path: "{{ dbeaver_dst_dir }}"
-  state: directory
+    path: "{{ dbeaver_dst_dir }}"
+    state: directory
   tags: mysql
 
 - name: Copiar arquivo data-sources.json
