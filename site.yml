@@ -38,8 +38,10 @@
     mysql_root_password_current: "{{ mysql_root_password }}"
     mysql_root_password_new: "{{ mysql_root_password }}"
     dbeaver_src: "data-sources.json"
+    dbeaver_credential: "credentials-config.json"
     dbeaver_dst_dir: "C:\\Users\\{{ ansible_user }}\\AppData\\Roaming\\DBeaverData\\workspace6\\General\\.dbeaver"
-    dbeaver_dst_file: "{{ dbeaver_dst_dir }}\\data-sources.json"
+    dbeaver_dst_credential: "{{ dbeaver_dst_dir }}\\{{ dbeaver_credential }}"
+    dbeaver_dst_file: "{{ dbeaver_dst_dir }}\\{{ dbeaver_src }}"
   tasks:
     - name: Instalar mysql
       import_tasks: tasks/install_mysql.yml

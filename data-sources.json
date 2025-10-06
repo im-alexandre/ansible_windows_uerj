@@ -4,7 +4,7 @@
 		"mysql8-199b99d124b-78ef3d2caebde35c": {
 			"provider": "mysql",
 			"driver": "mysql8",
-			"name": "localhost",
+			"name": "laboratorio",
 			"save-password": true,
 			"configuration": {
 				"host": "localhost",

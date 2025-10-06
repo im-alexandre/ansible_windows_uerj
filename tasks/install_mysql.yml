@@ -19,7 +19,7 @@
   tags: mysql
   no_log: true
 
-- name: Deinstalar MySQL (community edition) via choco
+- name: Desinstalar MySQL (community edition) via choco
   win_chocolatey:
     name: mysql
     state: absent
@@ -85,4 +85,10 @@
   ansible.windows.win_copy:
     src: "{{ dbeaver_src }}"
     dest: "{{ dbeaver_dst_file }}"
+  tags: mysql
+
+- name: Copiar arquivo de credenciais (usuário local)
+  ansible.windows.win_copy:
+    src: "{{ dbeaver_credential }}"
+    dest: "{{ dbeaver_dst_credential }}"
   tags: mysql
