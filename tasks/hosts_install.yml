@@ -1,0 +1,62 @@
+# tasks/hosts_install.yml
+# Executa em CADA HOST Windows
+---
+- name: Garantir diretório de destino no host
+  ansible.windows.win_file:
+    path: "{{ remote_offline_root }}"
+    state: directory
+
+# Copiar ÁRVORE inteira do WSL → host (direto, sem zip)
+- name: Copiar repositório offline do WSL para o host (pode demorar na 1ª vez)
+  ansible.windows.win_copy:
+    src: "{{ wsl_mirror_dir }}"
+    dest: "{{ remote_offline_root }}"
+
+- name: Adicionar/atualizar fonte OFFLINE no host
+  community.windows.win_chocolatey_source:
+    name: "{{ offline_source_name }}"
+    state: present
+    source: "{{ remote_offline_packages }}"
+    priority: 1
+    bypass_proxy: yes
+
+- name: Copiar packages.txt do WSL para o host
+  ansible.windows.win_copy:
+    src: "{{ wsl_packages_file }}"
+    dest: "{{ remote_packages_file }}"
+
+- name: Ler lista de pacotes no host
+  ansible.windows.win_shell: |
+    Get-Content "{{ remote_packages_file }}" |
+      Where-Object { $_.Trim() -ne "" -and -not ($_.Trim().StartsWith("#")) }
+  register: pkgs_hosts
+  changed_when: false
+
+# Instalação OFFLINE (versão + parâmetros)
+- name: Instalar pacotes offline nos hosts (versão e parâmetros)
+  ansible.windows.win_chocolatey:
+    name: "{{ (item.split(' ',1)[0].split('=',1)[0]).lower() }}"
+    version: "{{ (item.split(' ',1)[0].split('=',1)[1]) | default(omit) }}"
+    state: present
+    allow_prerelease: no
+    source: "{{ offline_source_name }}"
+    package_params: "{{ (item.split(' ',1)[1]) | default(omit) }}"
+  loop: "{{ pkgs_hosts.stdout_lines }}"
+  register: install_hosts
+  ignore_errors: true
+
+# (Opcional) Diagnóstico de pacotes ausentes no repo local do host
+- name: Checar presença de cada pacote na pasta offline do host
+  ansible.windows.win_shell: |
+    $base = "{{ item.split(' ',1)[0] }}".ToLower()
+    $name = $base.Split('=')[0]
+    $p = Join-Path "{{ remote_offline_packages }}" $name
+    if (Test-Path $p) { "OK: $name" } else { "MISSING: $name" }
+  loop: "{{ pkgs_hosts.stdout_lines }}"
+  register: presence_check
+  changed_when: false
+
+- name: Pacotes ausentes (se houver)
+  ansible.builtin.debug:
+    msg: "{{ presence_check.stdout_lines | select('match','^MISSING:') | list }}"
+  when: presence_check.stdout_lines | select('match','^MISSING:') | list | length > 0

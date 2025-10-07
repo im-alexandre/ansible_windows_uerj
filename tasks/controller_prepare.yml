@@ -1,0 +1,88 @@
+# tasks/controller_prepare.yml
+# Executa NO CONTROLADOR Windows
+---
+- name: Garantir diretório do nuget.exe
+  ansible.windows.win_file:
+    path: "{{ nuget_path | dirname }}"
+    state: directory
+
+- name: Baixar nuget.exe se não existir
+  ansible.windows.win_get_url:
+    url: https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
+    dest: "{{ nuget_path }}"
+
+- name: Garantir diretório do repositório offline
+  ansible.windows.win_file:
+    path: "{{ offline_packages_dir }}"
+    state: directory
+
+- name: Copiar packages.txt do WSL → CONTROLADOR
+  ansible.windows.win_copy:
+    src: "{{ wsl_packages_file }}"
+    dest: "{{ controller_packages_file }}"
+
+- name: Ler packages.txt no controlador
+  ansible.windows.win_shell: |
+    Get-Content "{{ controller_packages_file }}" |
+      Where-Object { $_.Trim() -ne "" -and -not ($_.Trim().StartsWith("#")) }
+  register: pkgs_controller
+  changed_when: false
+
+# Baixar para C:\choco-offline\packages usando nuget.exe
+# Suporta: "nome", "nome=versao", "nome=versao <params...>" (params são ignorados AQUI; servem na instalação)
+- name: Baixar pacotes via nuget.exe para o diretório oficial
+  ansible.windows.win_shell: |
+    $line = "{{ item }}"
+    $base,$params = $line.Split(' ',2)
+    $name,$ver = $base.Split('=',2)
+    if ([string]::IsNullOrWhiteSpace($ver)) {
+      & "{{ nuget_path }}" install $name -OutputDirectory "{{ offline_packages_dir }}" -Source https://community.chocolatey.org/api/v2/
+    } else {
+      & "{{ nuget_path }}" install $name -Version $ver -OutputDirectory "{{ offline_packages_dir }}" -Source https://community.chocolatey.org/api/v2/
+    }
+  loop: "{{ pkgs_controller.stdout_lines }}"
+  register: nuget_dl
+  changed_when: "'Installing' -in (nuget_dl.stdout + nuget_dl.stderr)"
+
+- name: Adicionar/atualizar fonte OFFLINE no controlador
+  community.windows.win_chocolatey_source:
+    name: "{{ offline_source_name }}"
+    state: present
+    source: "{{ offline_packages_dir }}"
+    priority: 1
+    bypass_proxy: yes
+
+# Instalar no CONTROLADOR – respeita versão (antes do 1º espaço) e parâmetros (após 1º espaço)
+- name: Instalar pacotes no controlador (versão + parâmetros)
+  ansible.windows.win_chocolatey:
+    name: "{{ (item.split(' ',1)[0].split('=',1)[0]).lower() }}"
+    version: "{{ (item.split(' ',1)[0].split('=',1)[1]) | default(omit) }}"
+    state: present
+    allow_prerelease: no
+    source: "{{ offline_source_name }}"
+    package_params: "{{ (item.split(' ',1)[1]) | default(omit) }}"
+  loop: "{{ pkgs_controller.stdout_lines }}"
+  register: install_controller
+  ignore_errors: true
+
+# ====== ESPELHAR ÁRVORE DO CONTROLADOR → WSL (sem ZIP/Samba) ======
+- name: Listar todos os arquivos do repositório offline no controlador
+  ansible.windows.win_find:
+    paths: "{{ offline_root }}"
+    file_type: file
+  register: repo_files
+
+- name: Criar diretório base no WSL para o espelho
+  delegate_to: localhost
+  ansible.builtin.file:
+    path: "{{ wsl_mirror_dir }}"
+    state: directory
+    mode: "0755"
+
+# Copia cada arquivo preservando a árvore relativa
+- name: Trazer arquivos do controlador para o WSL (fetch sem zip)
+  ansible.builtin.fetch:
+    src: "{{ item.path }}"
+    dest: "{{ wsl_mirror_dir }}/{{ item.relativepath | replace('\\','/') }}"
+    flat: yes
+  loop: "{{ repo_files.files }}"

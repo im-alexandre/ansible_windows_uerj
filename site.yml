@@ -1,47 +1,73 @@
 ---
-# site.yml — Playbook principal (único) com 2 plays
-# 1) Base: bootstrap do Chocolatey e instalação dos pacotes do packages.txt
-# 2) MySQL: Instalação e configuração do MySQL para usuario laboratorio
-# 3) Instalação do wsl e ubuntu no windows
-
-- name: Base Windows | Chocolatey + Pacotes
-  hosts: laboratorio9003
+# =========================================================
+# PLAY 1: Controlador - prepara repositório offline e instala nele
+# =========================================================
+- name: Preparar e instalar pacotes no CONTROLADOR
+  hosts: controller_win
   gather_facts: no
   vars:
-    packages_file: "{{ playbook_dir }}/{{ packages_list }}"
-    remote_temp: C:\temp_ansible
-    remote_packages_file: "{{ remote_temp }}\\packages.txt"
+    # packages.txt está no projeto do WSL
+    wsl_packages_file: "./packages.txt"
+
+    # Caminhos no CONTROLADOR Windows
+    controller_packages_file: "C:\\deploy\\packages.txt"
+    nuget_path: "C:\\Tools\\nuget.exe"
+    offline_root: "C:\\choco-offline"
+    offline_packages_dir: "{{ offline_root }}\\packages"
+    offline_source_name: "offline"
+
+    # Pasta local (no WSL) onde o repositório do controlador será espelhado
+    wsl_mirror_dir: "./artifacts/choco-offline"
+
   tasks:
-    - name: Preparar ambiente / pré-checagens
-      import_tasks: tasks/win_prep.yml
+    - import_tasks: "tasks/choco_bootstrap.yml"
+    - import_tasks: "tasks/controller_prepare.yml"
 
-    - name: Garantir Chocolatey instalado
-      import_tasks: tasks/choco_bootstrap.yml
-
-    - name: Instalar pacotes do packages.txt
-      import_tasks: tasks/choco_packages.yml
-
-- name: Instalar WSL e Ubuntu no Windows
-  hosts: laboratorio9003
+# =========================================================
+# PLAY 2: Hosts - copiar pacotes do WSL e instalar
+# =========================================================
+- name: Copiar repositório offline e instalar nos HOSTS
+  hosts: windows
   gather_facts: no
   vars:
-    wsl_distro: Ubuntu
+    # Diretório já espelhado no WSL pelo PLAY 1
+    wsl_mirror_dir: "./artifacts/choco-offline"
+
+    # Caminhos no host de destino
+    remote_offline_root: "C:\\ProgramData\\choco-offline"
+    remote_offline_packages: "{{ remote_offline_root }}\\packages"
+    offline_source_name: "offline"
+
+    # packages.txt no WSL (o mesmo arquivo)
+    wsl_packages_file: "./packages.txt"
+    remote_packages_file: "{{ remote_offline_root }}\\packages.txt"
+
   tasks:
-    - name: Instalar wsl
-      import_tasks: tasks/install_wsl.yml
+    - import_tasks: "tasks/choco_bootstrap.yml"
+    - import_tasks: "tasks/hosts_install.yml"
+      
 
-- name: Instalar MySQL no Windows via Chocolatey e configurar root
-  hosts: laboratorio9003
+# =========================================================
+# PLAY 3: Configurar MySQL e DBeaver nos hosts
+# =========================================================
+- name: Instalar e configurar MySQL + DBeaver nos HOSTS
+  hosts: windows
   gather_facts: no
   vars:
-    mysql_root_password: "root"   # Defina a senha desejada
-    mysql_root_password_current: "{{ mysql_root_password }}"
-    mysql_root_password_new: "{{ mysql_root_password }}"
+    mysql_root_password: "laboratorio"
     dbeaver_src: "data-sources.json"
+    dbeaver_dst_dir: "C:\\Users\\Laboratório\\AppData\\Roaming\\DBeaverData\\workspace6\\General\\.dbeaver"
+    dbeaver_dst_file: "{{ dbeaver_dst_dir }}\\data-sources.json"
     dbeaver_credential: "credentials-config.json"
-    dbeaver_dst_dir: "C:\\Users\\{{ ansible_user }}\\AppData\\Roaming\\DBeaverData\\workspace6\\General\\.dbeaver"
-    dbeaver_dst_credential: "{{ dbeaver_dst_dir }}\\{{ dbeaver_credential }}"
-    dbeaver_dst_file: "{{ dbeaver_dst_dir }}\\{{ dbeaver_src }}"
+    dbeaver_dst_credential: "{{ dbeaver_dst_dir }}\\credentials-config.json"
   tasks:
-    - name: Instalar mysql
-      import_tasks: tasks/install_mysql.yml
+    - import_tasks: "tasks/mysql_dbeaver.yml"
+
+# =========================================================
+# PLAY 4: Preparar wsl
+# =========================================================
+- name: Preparar recursos e instalar wsl
+  hosts: windows
+  gather_facts: no
+  tasks:
+    - import_tasks: "tasks/install_wsl.yml"

@@ -120,7 +120,7 @@ if ($targetIsAdminsFile) {
   Set-StrictAcl-UserOnly -Path $userAuth -User $UserName
 }
 
-#Write-Host "# endurece a própria id_rsa.pub do diretório"
+#Write-Host "# encadurece a própria id_rsa.pub do diretório"
 #try {
 #  icacls $privateKeySrc /inheritance:r | Out-Null
 #  $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name

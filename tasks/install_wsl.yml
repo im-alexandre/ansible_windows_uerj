@@ -28,7 +28,7 @@
 - name: Definir WSL2 como padrão
   win_shell: |
         Start-Process -FilePath "wsl.exe" -ArgumentList "-set-default-version 2" -Wait -Verb RunAs
- tags: wsl
+  tags: wsl
 
 - name: Instalar a distribuição Ubuntu
   win_shell: |
