@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<fileSnapshot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <files>
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\kubernetes-cli.nupkg" checksum="56C4DB6A386CCFAF92C5D9AB593C0708" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\kubernetes-cli.nuspec" checksum="E3026D186D429C19956698129005D621" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\kubernetes-client-windows-amd64.tar.gz.txt" checksum="79D23CD35B66C77EBC2AF04638E9354F" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\kubernetes-client-windows-amd64.tar.txt" checksum="2151D79A3A7112C3A18810EEFAA5409D" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\legal\LICENSE.txt" checksum="D273D63619C9AEAF15CDAF76422C4F87" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\legal\VERIFICATION.txt" checksum="C46697ECBA5045404B36CAB081F7A944" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\tools\chocolateyInstall.ps1" checksum="822286ABD4833F2CE2BE5A19929E8A4F" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\tools\kubernetes-client-windows-386.tar.gz" checksum="08A8BAB5650F5BE023A0A7708F551F21" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\tools\kubernetes-client-windows-amd64.tar.gz" checksum="E23F12CFB7A47A7EF6A0283F8594CD79" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\tools\kubernetes\client\bin\kubectl-convert.exe" checksum="3D42CDA21DF08571B1AC8CC5DAC5D7F7" />
+    <file path="C:\ProgramData\chocolatey\lib\kubernetes-cli\tools\kubernetes\client\bin\kubectl.exe" checksum="6F4B48DFCA95FFB68E9B3569F358FE8F" />
+  </files>
+</fileSnapshot>

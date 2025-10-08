@@ -1,0 +1,91 @@
+---
+# =========================================================
+# PLAY 1 — Controller Windows: coletar instalação do Choco
+# =========================================================
+- name: Coletar instalação base do Chocolatey do controller_win
+  hosts: controller_win
+  gather_facts: false
+
+  vars:
+    choco_root: 'C:\ProgramData\chocolatey'
+    wsl_choco_base: './artifacts/choco_base'
+    # Remover prefixo "C:\ProgramData\chocolatey\" (escapes duplos!)
+    choco_root_regex: '^C:\\\\ProgramData\\\\chocolatey\\\\'
+
+  tasks:
+    - name: Listar arquivos essenciais (choco.exe, bin, helpers, redirects)
+      win_find:
+        paths:
+          - "{{ choco_root }}"
+          - "{{ choco_root }}\\bin"
+          - "{{ choco_root }}\\helpers"
+          - "{{ choco_root }}\\redirects"
+        recurse: true
+        file_type: file
+        patterns:
+          - "*"
+      register: choco_files
+
+    - name: Trazer arquivos para o WSL preservando árvore
+      ansible.builtin.fetch:
+        src: "{{ item.path }}"
+        dest: "{{ wsl_choco_base }}/{{ (item.path | regex_replace(choco_root_regex, '')) | replace('\\\\','/') }}"
+        flat: true
+      loop: "{{ choco_files.files }}"
+
+# =========================================================
+# PLAY 2 — Replicar base do Choco nos hosts needs_choco
+# =========================================================
+- name: Instalar (replicar) Chocolatey base nos hosts que precisam
+  hosts: needs_choco
+  gather_facts: false
+
+  vars:
+    choco_root: 'C:\ProgramData\chocolatey'
+    wsl_choco_base: './artifacts/choco_base'
+
+  tasks:
+    - name: Parar serviço chocolatey-agent (se existir)
+      win_service:
+        name: chocolatey-agent
+        state: stopped
+      failed_when: false
+
+    - name: Matar processos choco/pwsh segurando a pasta (prevenção)
+      win_shell: |
+        Get-Process choco*,*chocolatey* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+      failed_when: false
+
+    - name: Garantir diretório de destino
+      win_file:
+        path: "{{ choco_root }}"
+        state: directory
+
+    - name: Copiar instalação base do Chocolatey do WSL para o host
+      win_copy:
+        src: "{{ wsl_choco_base }}"
+        dest: "{{ choco_root }}"
+
+    - name: Definir variável de ambiente ChocolateyInstall (Machine)
+      win_environment:
+        name: ChocolateyInstall
+        value: "{{ choco_root }}"
+        level: Machine
+        state: present
+
+    - name: Garantir PATH do sistema com o bin do Chocolatey
+      win_path:
+        elements:
+          - "{{ choco_root }}\\bin"
+        scope: machine
+        state: present
+
+    - name: Validar instalação - choco -v (chamando pelo caminho completo)
+      win_command: "{{ choco_root }}\\bin\\choco.exe -v"
+      register: choco_ver
+      changed_when: false
+      failed_when: choco_ver.rc != 0
+
+    - name: Exibir versão do Chocolatey
+      ansible.builtin.debug:
+        msg: "Host {{ inventory_hostname }} -> Chocolatey: {{ choco_ver.stdout | default('N/A') | trim }}"

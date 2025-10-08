@@ -6,7 +6,7 @@ help:
 	@echo "  setup     - prepara o ambiente no WSL (apt + venv + galaxy)"
 	@echo "  venv      - cria/atualiza .venv e instala requirements.txt"
 	@echo "  galaxy    - instala coleções/roles do requirements.yml"
-	@echo "  ping      - win_ping no grupo laboratorio9003"
+	@echo "  ping      - win_ping no grupo all"
 	@echo "  graph     - imprime o grafo do inventário"
 	@echo "  mysql     - executa install_mysql.yml (Instala o mysql)"
 	@echo "  wsl       - executa install_wsl.yml (Instala o wsl)"
@@ -33,9 +33,9 @@ galaxy:
 
 ping:
 ifeq ($(env),)
-	. .venv/bin/activate && ansible -i ./inventory.ini -m win_ping laboratorio9003
+	. .venv/bin/activate && ansible -i ./inventory.ini -m win_ping all
 else
-	. .venv/bin/activate && ansible -i ./inventory_$(env).ini -m win_ping laboratorio9003
+	. .venv/bin/activate && ansible -i ./inventory_$(env).ini -m win_ping all
 endif
 
 graph:

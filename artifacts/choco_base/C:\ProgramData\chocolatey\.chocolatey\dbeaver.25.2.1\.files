@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<fileSnapshot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <files>
+    <file path="C:\ProgramData\chocolatey\lib\dbeaver\dbeaver.nupkg" checksum="F242F6E0CF913D6C24FED54A10E693CF" />
+    <file path="C:\ProgramData\chocolatey\lib\dbeaver\dbeaver.nuspec" checksum="6E1F279761E3EF4250816D400523C710" />
+    <file path="C:\ProgramData\chocolatey\lib\dbeaver\legal\LICENSE.txt" checksum="B617DF0AEFAC693A360F6092BA7BAE2C" />
+    <file path="C:\ProgramData\chocolatey\lib\dbeaver\legal\VERIFICATION.txt" checksum="40C6E7C9BABE502B8244105C0C7B1508" />
+    <file path="C:\ProgramData\chocolatey\lib\dbeaver\tools\chocolateyInstall.ps1" checksum="861FAF49EE33E14B96B4676F870C98A3" />
+    <file path="C:\ProgramData\chocolatey\lib\dbeaver\tools\chocolateyUninstall.ps1" checksum="0F559B73AB1017D0BE77E125A9757149" />
+    <file path="C:\ProgramData\chocolatey\lib\dbeaver\tools\dbeaver-ce-25.2.1-x86_64-setup.exe.ignore" checksum="BEA07E6D2B8DCE396FE21BAA61B34956" />
+  </files>
+</fileSnapshot>

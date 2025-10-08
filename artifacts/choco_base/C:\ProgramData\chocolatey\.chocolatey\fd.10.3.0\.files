@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<fileSnapshot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <files>
+    <file path="C:\ProgramData\chocolatey\lib\fd\fd-v10.3.0-x86_64-pc-windows-msvc_x64.zip.txt" checksum="FC13F14BAA9762032CC9844A45050565" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\fd.nupkg" checksum="11CB68E6D527C7785AE33A1ABF55B83C" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\fd.nuspec" checksum="32563E28C8DE4642F30E0BF1CFBD7755" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\legal\LICENSE.txt" checksum="6E991B07194777C43783502BDCE05F8F" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\legal\VERIFICATION.txt" checksum="0B7432014AD18F16C750C97559B65034" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\chocolateyInstall.ps1" checksum="555A1CF5231FC60C8B33AC0F651463EB" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-i686-pc-windows-msvc_x32.zip" checksum="2492C20C9D86A57ABA54B712F0622873" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc_x64.zip" checksum="626994132AB344F63532476CEEAC877C" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\CHANGELOG.md" checksum="B6A08DEAE08A2ECC6C0063F78BB6C552" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\fd.1" checksum="523B1395C644CA7861A0EEDC46E22292" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\fd.exe" checksum="FAABE0C7800D92BC2C708D148C9C1F9B" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\LICENSE-APACHE" checksum="EC8FE16FE1AAF3CEBE7AE1D01D28782D" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\LICENSE-MIT" checksum="8B205AD7C9AAFC0713254CF0318E2570" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\README.md" checksum="64149816ED38D8999AE88F7D130018C9" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\autocomplete\fd.bash" checksum="1DC9C327076CEB191ABA7C5772D7DE66" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\autocomplete\fd.fish" checksum="7D456DF288CE2534B4456052EB91ADC4" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\autocomplete\fd.ps1" checksum="7B93FE002B6FACBA383708BB43D45F75" />
+    <file path="C:\ProgramData\chocolatey\lib\fd\tools\fd-v10.3.0-x86_64-pc-windows-msvc\autocomplete\_fd" checksum="DA653C703A226B41E4A12B592857F89B" />
+  </files>
+</fileSnapshot>
