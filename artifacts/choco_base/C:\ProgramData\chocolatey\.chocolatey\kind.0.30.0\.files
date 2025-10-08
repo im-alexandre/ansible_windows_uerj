@@ -1,9 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<fileSnapshot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <files>
-    <file path="C:\ProgramData\chocolatey\lib\kind\kind.exe" checksum="A753A421F50C894889C2AADB13942EDC" />
-    <file path="C:\ProgramData\chocolatey\lib\kind\kind.nupkg" checksum="BC154851771A024E50AA6773D0C368FA" />
-    <file path="C:\ProgramData\chocolatey\lib\kind\kind.nuspec" checksum="48C739A678F4CAEB0FF424AE9829A9B4" />
-    <file path="C:\ProgramData\chocolatey\lib\kind\tools\chocolateyinstall.ps1" checksum="B190D3552E0C434B9EE31BD0BEF1E15A" />
-  </files>
-</fileSnapshot>

@@ -1,8 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<fileSnapshot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <files>
-    <file path="C:\ProgramData\chocolatey\lib\awscli\awscli.nupkg" checksum="E1962B32BD64E183FCCFF24CD595C65B" />
-    <file path="C:\ProgramData\chocolatey\lib\awscli\awscli.nuspec" checksum="F223F5CEC64B0C0F4C22F26603329790" />
-    <file path="C:\ProgramData\chocolatey\lib\awscli\tools\chocolateyinstall.ps1" checksum="F4442018CF6EDB1CF510A5E3A35418BE" />
-  </files>
-</fileSnapshot>

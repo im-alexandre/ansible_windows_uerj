@@ -1,9 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<fileSnapshot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <files>
-    <file path="C:\ProgramData\chocolatey\lib\llvm\llvm.nupkg" checksum="2AE0237E8A74945F047EEED18D730FCE" />
-    <file path="C:\ProgramData\chocolatey\lib\llvm\llvm.nuspec" checksum="E61EC792561340FCD35C1EEF8CBF4425" />
-    <file path="C:\ProgramData\chocolatey\lib\llvm\tools\chocolateyinstall.ps1" checksum="9D5D1CCBF712CA1B1A008C426AD824AA" />
-    <file path="C:\ProgramData\chocolatey\lib\llvm\tools\chocolateyuninstall.ps1" checksum="D6C153BCE147E631F195361F88CCA713" />
-  </files>
-</fileSnapshot>

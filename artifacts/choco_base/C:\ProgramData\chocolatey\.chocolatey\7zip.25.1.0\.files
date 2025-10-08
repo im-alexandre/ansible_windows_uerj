@@ -1,7 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<fileSnapshot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <files>
-    <file path="C:\ProgramData\chocolatey\lib\7zip\7zip.nupkg" checksum="BA6E9BD7E14D4DE2E90E1EB737A5AF9A" />
-    <file path="C:\ProgramData\chocolatey\lib\7zip\7zip.nuspec" checksum="C0305E8A749D20D1488120A78608BB68" />
-  </files>
-</fileSnapshot>
