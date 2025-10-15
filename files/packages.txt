@@ -1,0 +1,32 @@
+﻿7zip
+7zip.install
+anaconda3 /AddToPath /JustMe
+chocolatey-core.extension
+chocolatey-dotnetfx.extension
+chocolatey-visualstudio.extension
+chocolatey-vscode.extension
+chocolatey-windowsupdate.extension
+curl
+dbeaver
+docker
+docker-cli
+docker-desktop
+dotnetfx
+git /GitAndUnixToolsOnPath /WindowsTerminal /NoAutoCrlf
+jasp
+mysql
+nodejs
+nodejs.install
+r
+R.Project
+r.studio
+rtools
+vcredist140
+vcredist2015
+visualstudio2022buildtools
+visualstudio2022-workload-vctools
+visualstudio-installer
+vscode
+vscode.install
+vscode-code-runner
+vscode-python

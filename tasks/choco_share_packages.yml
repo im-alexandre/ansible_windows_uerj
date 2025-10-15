@@ -1,0 +1,49 @@
+# === Compartilhar C:\choco_repo como \\<controller>\ChocoRepo (read-only p/ todos) ===
+- name: Garantir pasta do repositório
+  win_file:
+    path: "{{ repo_root }}"
+    state: directory
+
+- name: Criar/atualizar compartilhamento SMB (imune a idioma, leitura p/ todos)
+  win_shell: |
+      $ErrorActionPreference='Stop'; $ConfirmPreference='None'
+      $Name='{{ share_name }}'; $Path='{{ repo_root }}'
+      $SIDEveryone = 'S-1-1-0'   # Everyone
+      $SIDAuth     = 'S-1-5-11'  # Authenticated Users
+
+      New-Item -Path $Path -ItemType Directory -Force | Out-Null
+
+      $share = Get-SmbShare -Name $Name -ErrorAction SilentlyContinue
+      if (-not $share) {
+        New-SmbShare -Name $Name -Path $Path -CachingMode None -ReadAccess $SIDEveryone -Confirm:$false | Out-Null
+      } else {
+        # Limpa ACEs antigas e reaplica
+        Get-SmbShareAccess -Name $Name -ErrorAction SilentlyContinue | ForEach-Object {
+          Revoke-SmbShareAccess -Name $Name -AccountName $_.Name -Force -Confirm:$false -ErrorAction SilentlyContinue
+        }
+        Grant-SmbShareAccess -Name $Name -AccountName $SIDEveryone -AccessRight Read -Force -Confirm:$false | Out-Null
+        Set-SmbShare -Name $Name -CachingMode None -Confirm:$false | Out-Null
+      }
+
+- name: NTFS – leitura para Everyone (herdado)
+  win_shell: >
+    icacls "{{ repo_root }}" /grant *S-1-1-0:(OI)(CI)R /T /Q
+  args:
+    executable: cmd
+
+- name: Liberar SMB no firewall (TCP/445)
+  win_firewall_rule:
+    name: "ChocoRepo SMB 445"
+    display_name: "ChocoRepo SMB 445"
+    localport: 445
+    protocol: tcp
+    direction: in
+    action: allow
+    state: present
+    enabled: yes
+
+- name: Mostrar UNC do repositório
+  ansible.builtin.debug:
+    msg:
+      - "Repo: \\\\{{ controller_smb_host }}\\{{ share_name }}"
+      - "Diretório local: {{ repo_root }}"

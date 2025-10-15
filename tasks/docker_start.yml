@@ -1,0 +1,22 @@
+- name: Habilitar e iniciar o serviço Docker no Windows
+  win_service:
+    name: com.docker.service  # Nome do serviço do Docker
+    start_mode: auto          # Garantir que o serviço inicie automaticamente com o Windows
+    state: started            # Iniciar o serviço, caso ainda não esteja em execução
+
+- name: Pausa de 20 segundos para iniciar o container
+  pause:
+    seconds: 20
+
+- name: Criar um container POSTGRESQL
+  community.docker.docker_container:
+    name: postgres_container
+    image: postgres:latest
+    state: started
+    restart_policy: always
+    published_ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_USER: "postgres"
+      POSTGRES_DB: "postgres"

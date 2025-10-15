@@ -1,0 +1,245 @@
+- name: Instalar pacotes via choco
+  hosts: controller_win
+  gather_facts: no
+  vars:
+    choco_lib:      'C:\ProgramData\chocolatey\lib'
+    repo_root:      'C:\choco_repo'
+    repo_nupkg:     'C:\choco_repo\nupkg'
+    share_name:     'ChocoRepo'
+    choco_source_name: "choco_repo"
+    controller_smb_host: '192.168.0.139'   # opcional, só pra mensagem final
+    choco_unc:  '\\{{ controller_smb_host }}\{{ share_name }}'
+    unc_export: '{{ choco_unc }}\export'
+    unc_nupkg:  '{{ choco_unc }}\nupkg'
+    # se precisar aplicar um source extra durante a instalação do controller, adicione aqui
+    extra_source: ""   # ex: " -s https://community.chocolatey.org/api/v2/"
+
+    local_export:        'C:\Windows\Temp\choco_export'
+
+  tasks:
+  - name: Ler packages.txt
+    delegate_to: local
+    run_once: true
+    slurp:
+      src: "files/packages.txt"
+    register: pkgs_file
+
+  - name: Normalizar conteúdo
+    set_fact:
+      _pkgs_text: >-
+        {{ pkgs_file.content | b64decode
+            | regex_replace('^\uFEFF','')
+            | regex_replace('^\u00EF\u00BB\u00BF','')
+            | regex_replace('^"|"$','')
+            | regex_replace('\\\\r','')
+            | regex_replace('\\\\n','\n') }}
+
+  - name: Linhas úteis
+    set_fact:
+      _lines: >-
+        {{ _pkgs_text.splitlines()
+            | map('trim')
+            | reject('equalto','')
+            | reject('match','^#')
+            | list }}
+
+  - name: Inicializar lista
+    set_fact:
+      pkgs_ready: []
+
+  - name: Montar estrutura p/ win_chocolatey (name/version/pkg_args)
+    set_fact:
+      pkgs_ready: >-
+        {{ pkgs_ready + [ {
+            'name_only': name_ver[0],
+            'version':   ((name_ver | length) > 1) | ternary(name_ver[1], ''),
+            'pkg_args':  line_args
+          } ] }}
+    vars:
+      first_token: "{{ (item.split(' ', 1))[0] }}"
+      name_ver:    "{{ first_token.split('=', 1) }}"
+      line_args:   "{{ ((item.split(' ', 1) | length) > 1) | ternary((item.split(' ',1))[1], '') }}"
+    loop: "{{ _lines }}"
+    loop_control:
+      label: "{{ item }}"
+
+  # === Manifesto a partir de pkgs_ready ===
+  - name: Garantir diretório de export do manifesto
+    win_file:
+      path: "{{ repo_root }}\\export"
+      state: directory
+
+  # Constrói a lista de objetos para o JSON
+  - name: Montar lista para manifest.json (name/kind/args [+ versão opcional])
+    set_fact:
+      pkgs_manifest: |
+          {{ (pkgs_manifest | default([])) + [ {
+            'name': item.name_only,
+            'version': (item.version | trim | length > 0) | ternary(item.version, omit),
+            'kind': (item.pkg_args is search('--install-arguments')) | ternary('passthrough','params'),
+            'args': item.pkg_args | default('')
+          } ] }}
+    loop: "{{ pkgs_ready }}"
+    loop_control:
+      label: "{{ item.name_only }}"
+
+  - name: Salvar manifest.json
+    win_copy:
+      dest: "{{ repo_root }}\\export\\packages_with_params.json"
+      content: "{{ pkgs_manifest | to_nice_json }}"
+
+
+  # Demais linhas => usar params (ex.: /AddToPath /JustMe)
+  - name: Instalar com params quando NÃO houver --install-arguments
+    win_chocolatey:
+      name: "{{ item.name_only }}"
+      state: present
+      version: "{{ (item.version | trim | length > 0) | ternary(item.version, omit) }}"
+      params: "{{ (item.pkg_args | trim | length > 0) | ternary(item.pkg_args, omit) }}"
+    loop: "{{ pkgs_ready }}"
+    loop_control:
+      label: "{{ item }} (params)"
+
+  - name: Garantir diretórios do repositório
+    win_file:
+      path: "{{ item }}"
+      state: directory
+    loop:
+      - "{{ repo_root }}"
+      - "{{ repo_nupkg }}"
+
+  - name: Localizar todos os .nupkg no Chocolatey lib
+    win_find:
+      paths: "{{ choco_lib }}"
+      patterns: '*.nupkg'
+      recurse: yes
+    register: found_nupkg
+
+  - name: Copiar .nupkg para {{ repo_nupkg }}
+    win_copy:
+      src: "{{ item.path }}"
+      dest: "{{ repo_nupkg }}\\"
+      remote_src: true
+      force: true
+    loop: "{{ found_nupkg.files }}"
+    loop_control:
+      label: "{{ item.path }}"
+
+  # === Compartilhar C:\choco_repo como \\<controller>\ChocoRepo (read-only p/ todos) ===
+  - name: Garantir pasta do repositório
+    win_file:
+      path: "{{ repo_root }}"
+      state: directory
+
+  - name: Criar/atualizar compartilhamento SMB (imune a idioma, leitura p/ todos)
+    win_shell: |
+        $ErrorActionPreference='Stop'; $ConfirmPreference='None'
+        $Name='{{ share_name }}'; $Path='{{ repo_root }}'
+        $SIDEveryone = 'S-1-1-0'   # Everyone
+        $SIDAuth     = 'S-1-5-11'  # Authenticated Users
+
+        New-Item -Path $Path -ItemType Directory -Force | Out-Null
+
+        $share = Get-SmbShare -Name $Name -ErrorAction SilentlyContinue
+        if (-not $share) {
+          New-SmbShare -Name $Name -Path $Path -CachingMode None -ReadAccess $SIDEveryone -Confirm:$false | Out-Null
+        } else {
+          # Limpa ACEs antigas e reaplica
+          Get-SmbShareAccess -Name $Name -ErrorAction SilentlyContinue | ForEach-Object {
+            Revoke-SmbShareAccess -Name $Name -AccountName $_.Name -Force -Confirm:$false -ErrorAction SilentlyContinue
+          }
+          Grant-SmbShareAccess -Name $Name -AccountName $SIDEveryone -AccessRight Read -Force -Confirm:$false | Out-Null
+          Set-SmbShare -Name $Name -CachingMode None -Confirm:$false | Out-Null
+        }
+
+  - name: NTFS – leitura para Everyone (herdado)
+    win_shell: >
+      icacls "{{ repo_root }}" /grant *S-1-1-0:(OI)(CI)R /T /Q
+    args:
+      executable: cmd
+
+  - name: Liberar SMB no firewall (TCP/445)
+    win_firewall_rule:
+      name: "ChocoRepo SMB 445"
+      display_name: "ChocoRepo SMB 445"
+      localport: 445
+      protocol: tcp
+      direction: in
+      action: allow
+      state: present
+      enabled: yes
+
+  - name: Mostrar UNC do repositório
+    ansible.builtin.debug:
+      msg:
+        - "Repo: \\\\{{ controller_smb_host }}\\{{ share_name }}"
+        - "Diretório local: {{ repo_root }}"
+
+  # 0) (uma vez) garantir cliente aceita Guest inseguro
+  - name: Permitir cliente SMB convidado (guest)
+    ansible.windows.win_regedit:
+      path: HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters
+      name: AllowInsecureGuestAuth
+      type: dword
+      data: 1
+
+  - name: Reiniciar serviço Workstation para aplicar
+    ansible.windows.win_service:
+      name: LanmanWorkstation
+      state: restarted
+
+  # 1) limpar qualquer sessão SMB antiga com o controller
+  - name: Fechar sessões SMB antigas
+    ansible.windows.win_shell: 'cmd /c net use \\{{ controller_smb_host }} /delete /y'
+    changed_when: false
+    failed_when: false
+
+  # 2) abrir sessão explícita como Guest (sem prompt!)
+  - name: Abrir sessão SMB como Guest (sem senha)
+    ansible.windows.win_shell: 'cmd /c net use \\{{ controller_smb_host }}\IPC$ "" /user:Guest /persistent:no'
+    register: netuse_guest
+    changed_when: false
+    failed_when: netuse_guest.rc not in [0]
+
+  # 3) validar acesso ao share (evita “Acesso negado” depois)
+  - name: Testar acesso ao share
+    ansible.windows.win_shell: 'cmd /c dir \\{{ controller_smb_host }}\{{ share_name }}'
+    register: dir_share
+    changed_when: false
+    failed_when: dir_share.rc not in [0]
+
+
+  # --- COPIAR MANIFESTO ---
+
+  - name: Garantir pasta local do manifesto
+    win_file:
+      path: "{{ local_export | default('C:\\Windows\\Temp\\choco_export') }}"
+      state: directory
+
+  - name: Copiar manifesto do controller -> local (via sessão SMB já aberta)
+    win_shell: >
+      powershell -NoProfile -ExecutionPolicy Bypass -Command
+      "Copy-Item -Path '\\{{ controller_smb_host }}\{{ share_name }}\export\packages_with_params.json'
+                  -Destination '{{ (local_export | default('C:\Windows\Temp\choco_export')) }}\packages_with_params.json'
+                  -Force -ErrorAction Stop"
+    register: copy_manifest
+    changed_when: true
+
+  - name: Ler JSON do manifesto (local)
+    win_shell: >
+      powershell -NoProfile -ExecutionPolicy Bypass -Command
+      "Get-Content -Path '{{ (local_export | default('C:\Windows\Temp\choco_export')) }}\packages_with_params.json' -Raw"
+    register: manifest_json
+    changed_when: false
+
+  - name: Parse do manifesto
+    set_fact:
+      pkgs_from_manifest: "{{ manifest_json.stdout | from_json }}"
+
+  - name: Instalar (via install_args)
+    win_chocolatey:
+      name: "{{ item.name }}"
+      state: present
+      source: "{{ choco_source_name | default('choco_repo') }}"
+      install_args: "{{ (item.args | regex_replace('.*--install-arguments\\s+','')) | trim }}"
+    loop: "{{ pkgs_from_manifest }}"
