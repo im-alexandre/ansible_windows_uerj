@@ -1,0 +1,119 @@
+
+- name: Definir caminhos UNC
+  set_fact:
+    choco_unc:  "\\\\{{ controller_smb_host }}\\{{ share_name }}"
+    unc_export: "\\\\{{ controller_smb_host }}\\{{ share_name }}\\export"
+    unc_nupkg:  "\\\\{{ controller_smb_host }}\\{{ share_name }}\\nupkg"
+
+# --- FORÇAR SHELL CMD (só para estas tasks) ---
+- name: Fechar sessões SMB antigas com o controller
+  win_shell: 'net use \\{{ controller_smb_host }} /delete /y'
+  args:
+    executable: cmd
+  changed_when: false
+  failed_when: false
+
+# Tente com SERVER\user (melhor para conta local do controller)
+- name: Abrir sessão SMB com usuário/senha (SERVER\user)
+  win_shell: >
+    net use \\{{ controller_smb_host }}\IPC$ {{ smb_pass }} /user:{{ controller_netbios | default(controller_smb_host) }}\{{ smb_user }} /persistent:no
+  args:
+    executable: cmd
+  register: netuse_try1
+  changed_when: false
+  failed_when: false
+
+# Fallback: tente só com user (alguns ambientes aceitam)
+- name: Abrir sessão SMB com usuário/senha (user simples) se a 1ª falhar
+  win_shell: >
+    net use \\{{ controller_smb_host }}\IPC$ {{ smb_pass }} /user:{{ smb_user }} /persistent:no
+  args:
+    executable: cmd
+  when: netuse_try1.rc != 0
+  register: netuse_try2
+  changed_when: false
+  failed_when: false
+
+# Validar que pelo menos uma conectou
+- name: Validar sessão SMB estabelecida
+  ansible.builtin.assert:
+    that:
+      - (netuse_try1 is defined and netuse_try1.rc == 0) or (netuse_try2 is defined and netuse_try2.rc == 0)
+    fail_msg: >
+      Não foi possível abrir sessão SMB em \\{{ controller_smb_host }}. Verifique usuário/senha e se o share aceita esse login.
+
+# (Opcional) Listar o share para garantir acesso
+- name: Testar acesso ao share
+  win_shell: 'dir \\{{ controller_smb_host }}\{{ share_name }}'
+  args:
+    executable: cmd
+  changed_when: false
+
+
+# 1) Testar o UNC antes
+- win_command: cmd.exe /c dir {{ unc_nupkg }}
+  changed_when: false
+
+# 2) (Opcional) desabilitar a fonte pública para evitar acesso externo
+- win_chocolatey_source:
+    name: chocolatey
+    state: disabled
+
+# 3) Só então criar/ajustar a fonte SMB
+- win_chocolatey_source:
+    name: "{{ choco_source_name }}"
+    state: present
+    source: "{{ unc_nupkg }}"
+    priority: 1
+    bypass_proxy: yes
+
+- name: Copiar manifesto do controller -> local
+  win_shell: >
+    powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
+    "Copy-Item -Path '{{ unc_export }}\packages_with_params.json' -Destination '{{ local_export }}\packages_with_params.json' -Force -ErrorAction Stop"
+  register: copy_manifest
+  changed_when: true
+  failed_when: copy_manifest.rc not in [0]
+
+- name: Ler JSON do manifesto (local)
+  win_shell: >
+    powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
+    "Get-Content -Path '{{ local_export }}\packages_with_params.json' -Raw"
+  register: manifest_json
+  changed_when: false
+  failed_when: manifest_json.rc not in [0]
+
+- name: Parse do manifesto
+  set_fact:
+    pkgs_from_manifest: "{{ manifest_json.stdout | from_json }}"
+
+# 3) Fonte do Chocolatey e instalação
+- name: Garantir fonte Chocolatey -> SMB (nupkg)
+  win_chocolatey_source:
+    name: "{{ choco_source_name }}"
+    state: present
+    source: "{{ unc_nupkg }}"
+    priority: 1
+    bypass_proxy: yes
+
+- name: Instalar pacotes (via install_args)
+  win_chocolatey:
+    name: "{{ item.name }}"
+    state: present
+    source: "{{ choco_source_name }}"
+    install_args: "{{ (item.args | regex_replace('.*--install-arguments\\s+','')) | trim }}"
+  loop: "{{ pkgs_from_manifest }}"
+  when: item.kind == 'passthrough'
+  loop_control:
+    label: "{{ item.name }} (install_args)"
+
+- name: Instalar pacotes (via params)
+  win_chocolatey:
+    name: "{{ item.name }}"
+    state: present
+    source: "{{ choco_source_name }}"
+    params: "{{ (item.args | trim | length > 0) | ternary(item.args, omit) }}"
+  loop: "{{ pkgs_from_manifest }}"
+  when: item.kind != 'passthrough'
+  loop_control:
+    label: "{{ item.name }} (params)"

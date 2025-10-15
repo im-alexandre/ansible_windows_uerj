@@ -1,0 +1,148 @@
+---
+# --- 1) Ler e transformar packages.txt (no host que executa o playbook) ---
+- name: Ler packages.txt
+  vars:
+    ansible_connection: local
+    ansible_shell_type: sh
+  delegate_to: local
+  run_once: true
+  ansible.builtin.slurp:
+    src: "files/packages.txt"
+  register: pkgs_file
+
+- name: Normalizar conteúdo
+  set_fact:
+    _pkgs_text: >-
+      {{ pkgs_file.content | b64decode
+          | regex_replace('^\uFEFF','')
+          | regex_replace('^\u00EF\u00BB\u00BF','')
+          | regex_replace('^"|"$','')
+          | regex_replace('\\\\r','')
+          | regex_replace('\\\\n','\n') }}
+
+- name: Linhas úteis
+  set_fact:
+    _lines: >-
+      {{ _pkgs_text.splitlines()
+          | map('trim')
+          | reject('equalto','')
+          | reject('match','^#')
+          | list }}
+
+- name: Inicializar listas
+  set_fact:
+    pkgs_ready: []
+    pkgs_manifest: []
+
+- name: Montar estrutura p/ win_chocolatey (name/version/pkg_args)
+  set_fact:
+    pkgs_ready: >-
+      {{ pkgs_ready + [ {
+          'name_only': name_ver[0],
+          'version':   ((name_ver | length) > 1) | ternary(name_ver[1], ''),
+          'pkg_args':  line_args
+        } ] }}
+  vars:
+    first_token: "{{ (item.split(' ', 1))[0] }}"
+    name_ver:    "{{ first_token.split('=', 1) }}"
+    line_args:   "{{ ((item.split(' ', 1) | length) > 1) | ternary((item.split(' ',1))[1], '') }}"
+  loop: "{{ _lines }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Construir manifesto (name/kind/args [+ versão opcional])
+  set_fact:
+    pkgs_manifest: |
+        {{ pkgs_manifest + [ {
+          'name': item.name_only,
+          'version': (item.version | trim | length > 0) | ternary(item.version, omit),
+          'kind': (item.pkg_args is search('--install-arguments')) | ternary('passthrough','params'),
+          'args': item.pkg_args | default('')
+        } ] }}
+  loop: "{{ pkgs_ready }}"
+  loop_control:
+    label: "{{ item.name_only }}"
+
+# --- 2) Preparar repositório no controller ---
+- name: Garantir diretórios do repositório
+  win_file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ repo_root }}"
+    - "{{ repo_export }}"
+    - "{{ repo_nupkg }}"
+
+- name: Salvar packages_with_params.json (manifesto)
+  win_copy:
+    dest: "{{ repo_export }}\\packages_with_params.json"
+    content: "{{ pkgs_manifest | to_nice_json }}"
+
+- name: Localizar todos os .nupkg instalados no controller
+  win_find:
+    paths: 'C:\ProgramData\chocolatey\lib'
+    patterns: '*.nupkg'
+    recurse: yes
+  register: found_nupkg
+
+- name: Copiar .nupkg para {{ repo_nupkg }}
+  win_copy:
+    src: "{{ item.path }}"
+    dest: "{{ repo_nupkg }}\\"
+    remote_src: true
+    force: true
+  loop: "{{ found_nupkg.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+# --- 3) Usuário local e compartilhamento restrito a ele ---
+- name: Criar/atualizar usuário local do share (senha forte)
+  win_powershell:
+    script: |
+      $ErrorActionPreference='Stop'
+      $User='{{ smb_user }}'; $Plain='{{ smb_pass }}'
+      if ([string]::IsNullOrWhiteSpace($Plain)) { throw 'Defina smb_pass com uma senha forte.' }
+      $sec = ConvertTo-SecureString $Plain -AsPlainText -Force
+      $local = Get-LocalUser -Name $User -ErrorAction SilentlyContinue
+      if ($null -eq $local) {
+        New-LocalUser -Name $User -Password $sec -PasswordNeverExpires:$true -UserMayNotChangePassword:$true | Out-Null
+      } else {
+        $local | Set-LocalUser -Password $sec -PasswordNeverExpires:$true | Out-Null
+      }
+      # Adiciona ao grupo "Users" (resolve nome localizado pelo SID do grupo Users)
+      $UsersGroup = (New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-32-545').Translate([System.Security.Principal.NTAccount]).Value
+      try { Add-LocalGroupMember -Group $UsersGroup -Member $User -ErrorAction SilentlyContinue } catch {}
+
+- name: Recriar share apenas com o usuário (remove ACEs antigas)
+  win_powershell:
+    script: |
+      $ErrorActionPreference='Stop'; $ConfirmPreference='None'
+      $Name='{{ share_name }}'; $Path='{{ repo_root }}'
+      $UserFqdn="$env:COMPUTERNAME\{{ smb_user }}"
+      New-Item -Path $Path -ItemType Directory -Force | Out-Null
+      # Remove se existir
+      try { Remove-SmbShare -Name $Name -Force -Confirm:$false } catch {}
+      # Cria share "limpo"
+      New-SmbShare -Name $Name -Path $Path -CachingMode None -Confirm:$false | Out-Null
+      # Concede Full no SHARE ao usuário
+      Grant-SmbShareAccess -Name $Name -AccountName $UserFqdn -AccessRight Full -Force -Confirm:$false | Out-Null
+
+# SUBSTITUA a task que falhou por esta:
+- name: NTFS – conceder Modificar ao usuário e remover Everyone (via CMD)
+  win_shell: |
+    icacls "{{ repo_root }}" /grant "%COMPUTERNAME%\{{ smb_user }}":(OI)(CI)M /T /Q
+    icacls "{{ repo_root }}" /remove *S-1-1-0 /T /Q
+  args:
+    executable: cmd
+
+
+- name: Liberar SMB no firewall (TCP/445)
+  win_firewall_rule:
+    name: "ChocoRepo SMB 445"
+    display_name: "ChocoRepo SMB 445"
+    localport: 445
+    protocol: tcp
+    direction: in
+    action: allow
+    state: present
+    enabled: yes

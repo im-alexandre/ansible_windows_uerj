@@ -6,7 +6,7 @@ help:
 	@echo "  setup     - prepara o ambiente no WSL (apt + venv + galaxy)"
 	@echo "  venv      - cria/atualiza .venv e instala requirements.txt"
 	@echo "  galaxy    - instala coleções/roles do requirements.yml"
-	@echo "  ping      - win_ping no grupo all"
+	@echo "  ping      - win_ping no grupo laboratorio9003"
 	@echo "  graph     - imprime o grafo do inventário"
 	@echo "  mysql     - executa install_mysql.yml (Instala o mysql)"
 	@echo "  wsl       - executa install_wsl.yml (Instala o wsl)"
@@ -33,7 +33,7 @@ galaxy:
 
 ping:
 ifeq ($(env),)
-	. .venv/bin/activate && ansible -i ./inventory.ini -m win_ping all
+	. .venv/bin/activate && ansible -i ./inventory.ini -m win_ping all --limit '!localhost'
 else
 	. .venv/bin/activate && ansible -i ./inventory_$(env).ini -m win_ping all
 endif
@@ -47,14 +47,14 @@ endif
 
 deploy:
 ifeq ($(env),)
-	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --skip-tags wsl
+	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml
 else
-	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --skip-tags wsl
+	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml
 endif
 
 packages:
 ifeq ($(env),)
-	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --tags packages,choco
+	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --tags packages,choco -vvvv
 else
 	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --tags packages,choco
 endif

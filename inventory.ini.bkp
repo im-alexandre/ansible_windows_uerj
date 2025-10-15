@@ -1,14 +1,8 @@
 [all]
 [controller_win]
-winhost110 ansible_host=192.168.1.134
-[controller_win:vars]
-ansible_user="imale"
-ansible_ssh_private_key_file=~/.ssh/id_ed25519
+winhost110 ansible_host=192.168.1.110
 
-[local]
-localhost ansible_connection=local
-
-[windows]
+[laboratorio9003]
 winhost119 ansible_host=192.168.1.119
 winhost145 ansible_host=192.168.1.145
 winhost146 ansible_host=192.168.1.146
@@ -46,3 +40,5 @@ ansible_ssh_retries=3
 ansible_port=2313
 packages_list=packages.txt
 ansible_ssh_private_key_file=~/.ssh/id_laboratorio
+ansible_ssh_timeout=10
+controller_smb_host=192.168.1.201

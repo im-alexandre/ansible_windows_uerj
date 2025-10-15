@@ -1,36 +1,49 @@
 ---
 - name: Ativar recurso WSL (cliente Windows)
-  ansible.windows.win_optional_feature:
+  win_optional_feature:
     name: Microsoft-Windows-Subsystem-Linux
     state: present
     include_parent: yes
   register: feat_wsl
-  tags: wsl
 
 - name: Ativar recurso VirtualMachinePlatform (cliente Windows)
-  ansible.windows.win_optional_feature:
+  win_optional_feature:
     name: VirtualMachinePlatform
     state: present
     include_parent: yes
   register: feat_vmp
-  tags: wsl
+
 
 - name: Reboot se algum recurso foi alterado
-  ansible.windows.win_reboot:
+  win_reboot:
   when: (feat_wsl.changed | default(false)) or (feat_vmp.changed | default(false))
-  tags: wsl
-  
+
+
 - name: Instalar o WSL
   win_shell: |
         Start-Process -FilePath "wsl.exe" -ArgumentList "--install" -Wait -Verb RunAs
-  tags: wsl
-  
+
+
 - name: Definir WSL2 como padrão
   win_shell: |
         Start-Process -FilePath "wsl.exe" -ArgumentList "-set-default-version 2" -Wait -Verb RunAs
-  tags: wsl
+
 
 - name: Instalar a distribuição Ubuntu
   win_shell: |
         Start-Process -FilePath "wsl.exe" -ArgumentList "--install -d Ubuntu" -Wait -Verb RunAs
-  tags: wsl
+
+
+- name: Inicializar Ubuntu e executar comandos
+  win_shell: |
+      $timeout = 240  # Tempo máximo de execução em segundos
+          $start_time = Get-Date
+          $process = Start-Process -FilePath "wsl.exe" -ArgumentList "-d Ubuntu", "-- bash -c 'while ! sudo test -f /etc/lsb-release; do sleep 4; done;" -PassThru
+
+          while ($process.HasExited -eq $false) {
+            if (((Get-Date) - $start_time).TotalSeconds -gt $timeout) {
+              $process.Kill()  # Se o tempo exceder o limite, matar o processo
+              throw "O tempo de execução excedeu o limite de $timeout segundos."
+            }
+            Start-Sleep -Seconds 1  # Aguardar 1 segundo antes de checar novamente
+          }

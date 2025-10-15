@@ -1,57 +1,69 @@
 ---
 # =========================================================
-# PLAY 1: Controlador - prepara repositório offline e instala nele
+# PLAY 1: Instalar wsl
 # =========================================================
-- name: Preparar e instalar pacotes no CONTROLADOR
+- name: Instalar WSL e configurar o Ubuntu para Docker Desktop no Windows
+  gather_facts: yes
+  hosts: laboratorio9003
+  tasks:
+    - import_tasks: "tasks/wsl_install.yml"
+
+    - name: Reiniciar o host
+      win_reboot:
+        reboot_timeout: 600  # Tempo máximo de espera (em segundos) para o reinício
+        pre_reboot_delay: 60
+        test_command: whoami  # Comando para testar se a máquina está online após o reinício      win_reboot:
+  tags: wsl
+
+# =========================================================
+# PLAY 2: Instalar pacotes no controller e compartilha pacotes + manifesto
+# =========================================================
+- name: Preparar repositório/manifesto e compartilhar com usuário+senha
   hosts: controller_win
   gather_facts: no
+  collections:
+    - ansible.windows
   vars:
-    # packages.txt está no projeto do WSL
-    wsl_packages_file: "./packages.txt"
+    # Caminhos no controller
+    repo_root:   'C:\ChocoRepo'
+    repo_export: 'C:\ChocoRepo\export'
+    repo_nupkg:  'C:\ChocoRepo\nupkg'
+    share_name:  'ChocoRepo'
 
-    # Caminhos no CONTROLADOR Windows
-    controller_packages_file: "C:\\deploy\\packages.txt"
-    nuget_path: "C:\\Tools\\nuget.exe"
-    offline_root: "C:\\choco-offline"
-    offline_packages_dir: "{{ offline_root }}\\packages"
-    offline_source_name: "offline"
-
-    # Pasta local (no WSL) onde o repositório do controlador será espelhado
-    wsl_mirror_dir: "./artifacts/choco-offline"
-
+    # Credenciais do compartilhamento (usuario LOCAL do controller)
+    smb_user: 'repo_user'
+    smb_pass: 'TroqueEstaSenha!2025'
   tasks:
-    - import_tasks: "tasks/choco_bootstrap.yml"
-    - import_tasks: "tasks/controller_prepare.yml"
+    - import_tasks: "tasls/choco_controller.yml"
+  tags: [choco, packages, bootstrap]
 
-# =========================================================
-# PLAY 2: Hosts - copiar pacotes do WSL e instalar
-# =========================================================
-- name: Copiar repositório offline e instalar nos HOSTS
-  hosts: windows
+# ======================
+# PLAY 3 — Instala pacotes nos nodes a partir do compartilhamento
+# ======================
+- name: Instalar pacotes nos nodes a partir do share do controller (com usuário/senha)
+  hosts: laboratorio9003
   gather_facts: no
+  collections:
+    - ansible.windows
+
   vars:
-    # Diretório já espelhado no WSL pelo PLAY 1
-    wsl_mirror_dir: "./artifacts/choco-offline"
-
-    # Caminhos no host de destino
-    remote_offline_root: "C:\\ProgramData\\choco-offline"
-    remote_offline_packages: "{{ remote_offline_root }}\\packages"
-    offline_source_name: "offline"
-
-    # packages.txt no WSL (o mesmo arquivo)
-    wsl_packages_file: "./packages.txt"
-    remote_packages_file: "{{ remote_offline_root }}\\packages.txt"
+          # AJUSTE para IP/nome do controller
+    share_name:          "ChocoRepo"
+    choco_source_name:   "choco_repo"
+    local_export:        "C:\\Windows\\Temp\\choco_export"
+    # Mesmas credenciais criadas no controller:
+    smb_user: 'repo_user'
+    smb_pass: 'TroqueEstaSenha!2025'
 
   tasks:
-    - import_tasks: "tasks/choco_bootstrap.yml"
-    - import_tasks: "tasks/hosts_install.yml"
-      
+  ignore_errors: true
+  tags: [choco, packages, bootstrap]
 
 # =========================================================
 # PLAY 3: Configurar MySQL e DBeaver nos hosts
 # =========================================================
 - name: Instalar e configurar MySQL + DBeaver nos HOSTS
-  hosts: windows
+  hosts: all
   gather_facts: no
   vars:
     mysql_root_password: "laboratorio"
@@ -61,13 +73,30 @@
     dbeaver_credential: "credentials-config.json"
     dbeaver_dst_credential: "{{ dbeaver_dst_dir }}\\credentials-config.json"
   tasks:
-    - import_tasks: "tasks/mysql_dbeaver.yml"
+    - import_tasks: "tasks/mysql_install.yml"
+      ignore_errors: true
+
 
 # =========================================================
-# PLAY 4: Preparar wsl
+# PLAY 4: Criar um container postgresql
 # =========================================================
-- name: Preparar recursos e instalar wsl
-  hosts: windows
-  gather_facts: no
+- name: Habilitar docker e iniciar postgresql
+  hosts: all
   tasks:
-    - import_tasks: "tasks/install_wsl.yml"
+    - import_tasks: "tasks/docker_start.yml"
+  tags: docker
+  ignore_errors: true
+
+
+# =========================================================
+# PLAY 5: Desligar tudo
+# =========================================================
+- name: Desligar os hosts após a execução
+  hosts: all
+  tasks:
+    - name: Criar um container POSTGRESQL
+      win_command: shutdown /s /f /t 0
+      ignore_errors: yes  # Ignorar erros caso o comando não funcione
+  tags: mysql
+
+
