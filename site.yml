@@ -56,6 +56,8 @@
     smb_pass: 'TroqueEstaSenha!2025'
 
   tasks:
+    - import_tasks: "tasks/choco_bootstrap.yml"
+    - import_tasks: "tasks/choco_nodes.yml"
   ignore_errors: true
   tags: [choco, packages, bootstrap]
 

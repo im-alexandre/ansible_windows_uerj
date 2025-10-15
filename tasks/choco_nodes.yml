@@ -97,11 +97,14 @@
     bypass_proxy: yes
 
 - name: Instalar pacotes (via install_args)
-  win_chocolatey:
-    name: "{{ item.name }}"
-    state: present
-    source: "{{ choco_source_name }}"
-    install_args: "{{ (item.args | regex_replace('.*--install-arguments\\s+','')) | trim }}"
+  block:
+    - debug:
+        msg: "Instalando {{ item }}"
+    - win_chocolatey:
+        name: "{{ item.name }}"
+        state: present
+        source: "{{ choco_source_name }}"
+        install_args: "{{ (item.args | regex_replace('.*--install-arguments\\s+','')) | trim }}"
   loop: "{{ pkgs_from_manifest }}"
   when: item.kind == 'passthrough'
   loop_control:
