@@ -16,47 +16,46 @@
   tags: wsl
 
 # =========================================================
-# PLAY 2: Instalar pacotes via choco
+# PLAY 2: Instalar pacotes no controller e compartilha pacotes + manifesto
 # =========================================================
-- name: Instalar pacotes via choco
+- name: Preparar repositório/manifesto e compartilhar com usuário+senha
   hosts: controller_win
   gather_facts: no
+  collections:
+    - ansible.windows
   vars:
-    choco_lib:      'C:\ProgramData\chocolatey\lib'
-    repo_root:      'C:\choco_repo'
-    repo_nupkg:     'C:\choco_repo\nupkg'
-    share_name:     'ChocoRepo'
-    choco_source_name: "choco_repo"
-    controller_smb_host: '192.168.0.139'   # opcional, só pra mensagem final
-    choco_unc:  '\\{{ controller_smb_host }}\{{ share_name }}'
-    unc_export: '{{ choco_unc }}\export'
-    unc_nupkg:  '{{ choco_unc }}\nupkg'
-    # se precisar aplicar um source extra durante a instalação do controller, adicione aqui
-    extra_source: ""   # ex: " -s https://community.chocolatey.org/api/v2/"
+    # Caminhos no controller
+    repo_root:   'C:\ChocoRepo'
+    repo_export: 'C:\ChocoRepo\export'
+    repo_nupkg:  'C:\ChocoRepo\nupkg'
+    share_name:  'ChocoRepo'
 
+    # Credenciais do compartilhamento (usuario LOCAL do controller)
+    smb_user: 'repo_user'
+    smb_pass: 'TroqueEstaSenha!2025'
   tasks:
-    - import_tasks: "tasks/choco_prep_packages.yml"
-    - import_tasks: "tasks/choco_share_packages.yml"
-    
-      ignore_errors: true
+    - import_tasks: "tasls/choco_controller.yml"
   tags: [choco, packages, bootstrap]
 
-- name: Instalar nos nodes
+# ======================
+# PLAY 3 — Instala pacotes nos nodes a partir do compartilhamento
+# ======================
+- name: Instalar pacotes nos nodes a partir do share do controller (com usuário/senha)
   hosts: laboratorio9003
   gather_facts: no
+  collections:
+    - ansible.windows
+
   vars:
-    share_name:     'ChocoRepo'
-    local_export:        'C:\Windows\Temp\choco_export'
-    choco_source_name: "choco_repo"
-    controller_smb_host: '192.168.0.139'   # opcional, só pra mensagem final
-    choco_unc: '\\{{ controller_smb_host }}\{{ share_name }}'
-    unc_export: '{{ choco_unc }}\export'
-    unc_nupkg:  '{{ choco_unc }}\nupkg'
-    # se precisar aplicar um source extra durante a instalação do controller, adicione aqui
-    extra_source: ""   # ex: " -s https://community.chocolatey.org/api/v2/"
+          # AJUSTE para IP/nome do controller
+    share_name:          "ChocoRepo"
+    choco_source_name:   "choco_repo"
+    local_export:        "C:\\Windows\\Temp\\choco_export"
+    # Mesmas credenciais criadas no controller:
+    smb_user: 'repo_user'
+    smb_pass: 'TroqueEstaSenha!2025'
 
   tasks:
-    - import_tasks: "tasks/choco_install_nodes.yml"
   ignore_errors: true
   tags: [choco, packages, bootstrap]
 
