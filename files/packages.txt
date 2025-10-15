@@ -27,6 +27,3 @@ visualstudio2022buildtools
 visualstudio2022-workload-vctools
 visualstudio-installer
 vscode
-vscode.install
-vscode-code-runner
-vscode-python
