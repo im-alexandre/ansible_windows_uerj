@@ -42,6 +42,7 @@
 # ======================
 - name: Instalar pacotes nos nodes a partir do share do controller (com usuário/senha)
   hosts: laboratorio9003
+  serial: 10
   gather_facts: no
   collections:
     - ansible.windows

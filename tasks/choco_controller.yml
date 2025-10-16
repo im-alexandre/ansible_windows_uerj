@@ -78,6 +78,40 @@
     dest: "{{ repo_export }}\\packages_with_params.json"
     content: "{{ pkgs_manifest | to_nice_json }}"
 
+
+- name: Ler JSON do manifesto (local)
+  win_shell: >
+    powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
+    "Get-Content -Path '{{ repo_export }}\packages_with_params.json' -Raw"
+  register: manifest_json
+  changed_when: false
+  failed_when: manifest_json.rc not in [0]
+
+- name: Parse do manifesto
+  set_fact:
+    pkgs_from_manifest: "{{ manifest_json.stdout | from_json }}"
+
+- name: Instalar pacotes (via install_args)
+  win_chocolatey:
+    name: "{{ item.name }}"
+    state: present
+    source: "{{ choco_source_name }}"
+  loop: "{{ pkgs_from_manifest }}"
+  when: item.args == ''
+  loop_control:
+    label: "{{ item.name }} (install_args)"
+
+- name: Instalar pacotes (via params)
+  win_chocolatey:
+    name: "{{ item.name }}"
+    state: present
+    source: "{{ choco_source_name }}"
+    params: "{{ (item.args | trim | length > 0) | ternary(item.args, omit) }}"
+  loop: "{{ pkgs_from_manifest }}"
+  when: item.args != ''
+  loop_control:
+    label: "{{ item.name }} (params)"
+
 - name: Localizar todos os .nupkg instalados no controller
   win_find:
     paths: 'C:\ProgramData\chocolatey\lib'
@@ -146,3 +180,5 @@
     action: allow
     state: present
     enabled: yes
+
+
