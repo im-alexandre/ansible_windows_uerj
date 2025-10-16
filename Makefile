@@ -54,7 +54,7 @@ endif
 
 packages:
 ifeq ($(env),)
-	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --tags packages,choco -vvvv
+	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --tags packages,choco -vv
 else
 	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --tags packages,choco
 endif

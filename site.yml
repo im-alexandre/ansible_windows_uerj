@@ -34,7 +34,7 @@
     smb_user: 'repo_user'
     smb_pass: 'TroqueEstaSenha!2025'
   tasks:
-    - import_tasks: "tasls/choco_controller.yml"
+    - import_tasks: "tasks/choco_controller.yml"
   tags: [choco, packages, bootstrap]
 
 # ======================
@@ -54,6 +54,7 @@
     # Mesmas credenciais criadas no controller:
     smb_user: 'repo_user'
     smb_pass: 'TroqueEstaSenha!2025'
+    controller_smb_host: 192.168.0.139
 
   tasks:
     - import_tasks: "tasks/choco_bootstrap.yml"
