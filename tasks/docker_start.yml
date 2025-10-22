@@ -56,4 +56,5 @@
       MYSQL_USER: "laboratorio"
       MYSQL_PASSWORD: "laboratorio"
       MYSQL_DATABASE: "laboratorio"
+
     volumes: ["mysql_data/var/lib/mysql"]
