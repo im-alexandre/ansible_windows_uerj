@@ -102,7 +102,7 @@
     state: present
     source: "{{ choco_source_name }}"
   loop: "{{ pkgs_from_manifest }}"
-  when: item.params == ''
+  when: item.args == ''
   loop_control:
     label: "{{ item.name }} (install_args)"
 
@@ -113,6 +113,6 @@
     source: "{{ choco_source_name }}"
     params: "{{ (item.args | trim | length > 0) | ternary(item.args, omit) }}"
   loop: "{{ pkgs_from_manifest }}"
-  when: item.kind != ''
+  when: item.args != ''
   loop_control:
     label: "{{ item.name }} (params)"

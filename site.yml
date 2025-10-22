@@ -114,3 +114,25 @@
         - platformdirs==4.2.2
   tasks:
     - import_tasks: "tasks/conda_configure.yml"
+
+
+- name: Configurar o neovim
+  hosts: nodes
+  gather_facts: false
+  tasks:
+    - name: Clonar configurações do Neovim no Windows
+      ansible.windows.win_shell: |
+        $configDir = "$env:LOCALAPPDATA\nvim"
+        if (!(Test-Path $configDir)) {
+          git clone https://github.com/alexandre07/nvim $configDir
+        } else {
+          Set-Location $configDir
+          git pull
+        }
+      args:
+        executable: pwsh
+      register: resultado
+
+    - name: Exibir saída do clone/pull
+      debug:
+        var: resultado.stdout
