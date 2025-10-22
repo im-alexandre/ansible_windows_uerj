@@ -1,5 +1,33 @@
 ---
+- name: Instalar o mamba
+  win_shell: |
+    & "{{ conda_exe }}" install -y -n base -c conda-forge mamba
+  register: install_mamba
+  changed_when: "'[y/N]' in install_mamba.stdout or 'Proceed' in install_mamba.stdout"
+
+
+- name: Criar diretórios otimizados para cache e envs
+  ansible.windows.win_file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ conda_root }}"
+    - "{{ conda_envs }}"
+    - "{{ conda_pkgs }}"
+
 - name: Criar o arquivo .condarc no home do usuário
   win_copy:
     content: "{{ condarc_content }}"
     dest: "{{ condarc_dest }}"
+
+
+- name: Testar instalação do Mamba
+  ansible.windows.win_shell: |
+    & "{{ conda_exe }}" run -n base mamba --version
+  args:
+    executable: powershell
+  register: mamba_version
+  changed_when: false
+
+- debug:
+    msg: "✅ Mamba instalado com sucesso: {{ mamba_version.stdout }}"

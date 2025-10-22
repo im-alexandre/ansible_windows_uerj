@@ -83,21 +83,25 @@
   hosts: nodes
   gather_facts: false
   vars:
+    conda_exe: "D:\\Anaconda3\\Scripts\\conda.exe"
+    conda_root: "D:\\conda"
+    conda_pkgs: "{{ conda_root }}\\conda_pkgs"
+    conda_envs: "{{ conda_root }}\\conda_envs"
     condarc_dest: "{{ ansible_env.USERPROFILE }}\\.condarc"
     condarc_content: |
       # channel_priority: strict
 
       envs_dirs:
-        - D:\conda_envs
+        - {{ conda_envs }}
 
       pkgs_dirs:
-        - D:\tools\anaconda3\pkgs
+        - {{ conda_pkgs }}
 
       repodata_fns:
         - current_repodata.json
         - repodata.json
 
-      auto_activate: true
+      auto_activate_base: false
       solver: libmamba
 
       auto_update_conda: false
@@ -114,7 +118,6 @@
         - platformdirs==4.2.2
   tasks:
     - import_tasks: "tasks/conda_configure.yml"
-
 
 - name: Configurar o neovim
   hosts: nodes

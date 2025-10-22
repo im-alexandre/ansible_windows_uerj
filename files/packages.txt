@@ -1,4 +1,4 @@
-﻿anaconda3 /AddToPath /JustMe
+﻿anaconda3 /AddToPath /JustMe /D:d:\Anaconda3
 git /GitAndUnixToolsOnPath /WindowsTerminal /NoAutoCrlf
 7zip
 7zip.install
