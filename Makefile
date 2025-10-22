@@ -32,46 +32,28 @@ galaxy:
 	. .venv/bin/activate && ansible-galaxy install -r requirements/requirements.yml
 
 ping:
-ifeq ($(env),)
+	. .env
 	. .venv/bin/activate && ansible -i ./inventory.ini -m win_ping all --limit '!localhost'
-else
-	. .venv/bin/activate && ansible -i ./inventory_$(env).ini -m win_ping all
-endif
 
 graph:
-ifeq ($(env),)
+	. .env
 	. .venv/bin/activate && ansible-inventory -i inventory.ini --graph
-else
-	. .venv/bin/activate && ansible-inventory -i inventory_$(env).ini --graph
-endif
 
 deploy:
-ifeq ($(env),)
+	. .env
 	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml
-else
-	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml
-endif
 
 packages:
-ifeq ($(env),)
+	. .env
 	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --tags packages,choco -vv
-else
-	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --tags packages,choco
-endif
 
 wsl:
-ifeq ($(env),)
+	. .env
 	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --tags wsl
-else
-	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --tags wsl
-endif
 
 mysql:
-ifeq ($(env),)
+	. .env
 	. .venv/bin/activate && ansible-playbook -i "./inventory.ini" site.yml --tags mysql
-else
-	. .venv/bin/activate && ansible-playbook -i "./inventory_$(env).ini" site.yml --tags mysql
-endif
 
 clean:
 	rm -rf .venv __pycache__

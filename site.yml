@@ -4,7 +4,7 @@
 # =========================================================
 - name: Instalar WSL e configurar o Ubuntu para Docker Desktop no Windows
   gather_facts: yes
-  hosts: laboratorio9003
+  hosts: nodes
   tasks:
     - import_tasks: "tasks/wsl_install.yml"
 
