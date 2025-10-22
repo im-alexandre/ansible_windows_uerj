@@ -29,10 +29,11 @@
     repo_export: 'C:\ChocoRepo\export'
     repo_nupkg:  'C:\ChocoRepo\nupkg'
     share_name:  'ChocoRepo'
+    choco_source_name:   "choco_repo"
 
     # Credenciais do compartilhamento (usuario LOCAL do controller)
-    smb_user: 'repo_user'
-    smb_pass: 'TroqueEstaSenha!2025'
+    smb_user: "{{ lookup('env', 'SMB_USER') }}"
+    smb_pass: "{{ lookup('env', 'SMB_PASS') }}"
   tasks:
     - import_tasks: "tasks/choco_controller.yml"
   tags: [choco, packages, bootstrap]
@@ -41,7 +42,7 @@
 # PLAY 3 — Instala pacotes nos nodes a partir do compartilhamento
 # ======================
 - name: Instalar pacotes nos nodes a partir do share do controller (com usuário/senha)
-  hosts: laboratorio9003
+  hosts: nodes
   serial: 10
   gather_facts: no
   collections:
@@ -53,8 +54,8 @@
     choco_source_name:   "choco_repo"
     local_export:        "C:\\Windows\\Temp\\choco_export"
     # Mesmas credenciais criadas no controller:
-    smb_user: 'repo_user'
-    smb_pass: 'TroqueEstaSenha!2025'
+    smb_user: "{{ lookup('env', 'SMB_USER') }}"
+    smb_pass: "{{ lookup('env', 'SMB_PASS') }}"
     controller_smb_host: 192.168.0.139
 
   tasks:
@@ -64,43 +65,52 @@
   tags: [choco, packages, bootstrap]
 
 # =========================================================
-# PLAY 3: Configurar MySQL e DBeaver nos hosts
-# =========================================================
-- name: Instalar e configurar MySQL + DBeaver nos HOSTS
-  hosts: all
-  gather_facts: no
-  vars:
-    mysql_root_password: "laboratorio"
-    dbeaver_src: "data-sources.json"
-    dbeaver_dst_dir: "C:\\Users\\Laboratório\\AppData\\Roaming\\DBeaverData\\workspace6\\General\\.dbeaver"
-    dbeaver_dst_file: "{{ dbeaver_dst_dir }}\\data-sources.json"
-    dbeaver_credential: "credentials-config.json"
-    dbeaver_dst_credential: "{{ dbeaver_dst_dir }}\\credentials-config.json"
-  tasks:
-    - import_tasks: "tasks/mysql_install.yml"
-      ignore_errors: true
-
-
-# =========================================================
-# PLAY 4: Criar um container postgresql
+# PLAY 4: Iniciar o docker
 # =========================================================
 - name: Habilitar docker e iniciar postgresql
-  hosts: all
+  hosts: nodes
   tasks:
     - import_tasks: "tasks/docker_start.yml"
+    - win_reboot:
   tags: docker
   ignore_errors: true
 
 
 # =========================================================
-# PLAY 5: Desligar tudo
+# PLAY 4: Configurar o conda
 # =========================================================
-- name: Desligar os hosts após a execução
-  hosts: all
+- name: Configurar Anaconda com .condarc personalizado
+  hosts: nodes
+  gather_facts: false
+  vars:
+    condarc_dest: "{{ ansible_env.USERPROFILE }}\\.condarc"
+    condarc_content: |
+      # channel_priority: strict
+
+      envs_dirs:
+        - D:\conda_envs
+
+      pkgs_dirs:
+        - D:\tools\anaconda3\pkgs
+
+      repodata_fns:
+        - current_repodata.json
+        - repodata.json
+
+      auto_activate: true
+      solver: libmamba
+
+      auto_update_conda: false
+      channels:
+        - conda-forge
+        - defaults
+
+      create_default_packages:
+        - jedi-language-server
+        - pygls<2.0 
+        - lsprotocol 
+        - pynvim
+        - pip
+        - platformdirs==4.2.2
   tasks:
-    - name: Criar um container POSTGRESQL
-      win_command: shutdown /s /f /t 0
-      ignore_errors: yes  # Ignorar erros caso o comando não funcione
-  tags: mysql
-
-
+    - import_tasks: "tasks/conda_configure.yml"

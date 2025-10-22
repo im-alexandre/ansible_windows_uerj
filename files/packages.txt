@@ -1,6 +1,10 @@
-﻿7zip
+﻿anaconda3 /AddToPath /JustMe
+git /GitAndUnixToolsOnPath /WindowsTerminal /NoAutoCrlf
+7zip
 7zip.install
-anaconda3 /AddToPath /JustMe
+awscli
+chocolatey
+chocolatey-compatibility.extension
 chocolatey-core.extension
 chocolatey-dotnetfx.extension
 chocolatey-visualstudio.extension
@@ -12,17 +16,45 @@ docker
 docker-cli
 docker-desktop
 dotnetfx
-git /GitAndUnixToolsOnPath /WindowsTerminal /NoAutoCrlf
+fd
+fzf
+gzip
 jasp
+KB2919355
+KB2919442
+KB2999226
+KB3033929
+KB3035131
+kind
+kubernetes-cli
+lazygit
+llvm
+lua51
+luarocks
+Minikube
+neovim
 nodejs
 nodejs.install
+pgadmin4
+psql
 r
 R.Project
 r.studio
+ripgrep
 rtools
+terraform
+tree-sitter
+vagrant
 vcredist140
 vcredist2015
+vcxsrv
+vifm
 visualstudio2022buildtools
 visualstudio2022-workload-vctools
 visualstudio-installer
 vscode
+vscode.install
+vscode-code-runner
+vscode-python
+wezterm.install
+zig

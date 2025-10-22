@@ -1,0 +1,5 @@
+---
+- name: Criar o arquivo .condarc no home do usuário
+  win_copy:
+    content: "{{ condarc_content }}"
+    dest: "{{ condarc_dest }}"

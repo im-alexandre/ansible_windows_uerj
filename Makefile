@@ -19,8 +19,6 @@ help:
 	@echo ""
 	@echo ""
 
-env ?=
-
 setup:
 	./scripts/setup_wsl.sh
 

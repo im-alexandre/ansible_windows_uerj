@@ -120,17 +120,6 @@ if ($targetIsAdminsFile) {
   Set-StrictAcl-UserOnly -Path $userAuth -User $UserName
 }
 
-#Write-Host "# encadurece a própria id_rsa.pub do diretório"
-#try {
-#  icacls $privateKeySrc /inheritance:r | Out-Null
-#  $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-#  icacls $privateKeySrc /setowner "$me" | Out-Null
-#  icacls $privateKeySrc /grant:r "${me}:(R)" "NT AUTHORITY\SYSTEM:(F)" | Out-Null
-#  foreach($sid in @('Todos','Usuários','Users','Authenticated Users','INTERACTIVE','Everyone','Administradores','Administrators')){
-#    icacls $privateKeySrc /remove:g $sid 2>$null | Out-Null
-#  }
-#} catch { }
-
 Write-Host "# ===== Ajustar sshd_config ====="
 if (-not (Test-Path $sshdConfig)){ New-Item -ItemType File -Path $sshdConfig -Force | Out-Null }
 $config = Get-Content -LiteralPath $sshdConfig -Raw
@@ -174,6 +163,3 @@ Write-Host "# Sanity check: confirmar AuthorizedKeysFile efetivo"
 $authList = & 'C:\Windows\System32\OpenSSH\sshd.exe' -T 2>$null | Select-String -Pattern 'authorizedkeysfile'
 Write-Host "`nAuthorizedKeysFile efetivo:" -ForegroundColor Cyan
 $authList | ForEach-Object { $_.ToString() } | Write-Host
-
-
-
