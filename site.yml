@@ -121,7 +121,7 @@
   gather_facts: false
   tasks:
     - name: Clonar configurações do Neovim no Windows
-      ansible.windows.win_shell: |
+      win_shell: |
         $configDir = "$env:LOCALAPPDATA\nvim"
         if (!(Test-Path $configDir)) {
           git clone https://github.com/alexandre07/nvim $configDir
