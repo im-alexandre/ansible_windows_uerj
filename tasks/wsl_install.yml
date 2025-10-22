@@ -31,7 +31,7 @@
 
 - name: Instalar a distribuição Ubuntu
   win_shell: |
-        Start-Process -FilePath "wsl.exe" -ArgumentList "--install -d Ubuntu" -Wait -Verb RunAs
+    Start-Process -FilePath "wsl.exe" -ArgumentList "--install -d Ubuntu --location D:\wsl\ubuntu" -Wait -Verb RunAs
 
 
 - name: Inicializar Ubuntu e executar comandos
