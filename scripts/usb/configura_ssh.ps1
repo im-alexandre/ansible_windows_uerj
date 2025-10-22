@@ -167,6 +167,116 @@ if ($old){ $old | Remove-NetFirewallRule }
 New-NetFirewallRule -DisplayName $fwRuleName -Direction Inbound -Action Allow `
   -Protocol TCP -LocalPort $Port -Profile Any | Out-Null
 
+# ===== PowerShell 7: instalar última versão estável + configurar como padrão do OpenSSH =====
+
+function Get-LatestPwshMsiUrl {
+  try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+  $rel = Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
+  # Pega MSI x64
+  ($rel.assets | Where-Object { $_.name -match 'PowerShell-.*-win-x64\.msi$' } | Select-Object -First 1).browser_download_url
+}
+
+function Get-InstalledPwsh {
+  $path = "C:\Program Files\PowerShell\7\pwsh.exe"
+  if (Test-Path $path) { return $path }
+  $reg = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\pwsh.exe'
+  try {
+    $p = (Get-ItemProperty -Path $reg -ErrorAction Stop).'(default)'
+    if ($p -and (Test-Path $p)) { return $p }
+  } catch {}
+  return $null
+}
+
+function Get-InstalledPwshVersion {
+  $pwsh = Get-InstalledPwsh
+  if (-not $pwsh) { return $null }
+  try { (& $pwsh -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()').Trim() } catch { $null }
+}
+
+function Install-LatestPwsh {
+  $cur = Get-InstalledPwshVersion
+  Write-Host "Versão atual do PowerShell 7 (se houver): $cur" -ForegroundColor DarkGray
+
+  $msiUrl = Get-LatestPwshMsiUrl
+  if (-not $msiUrl) { throw "Não consegui obter a URL do MSI mais recente do PowerShell 7." }
+
+  $dest = Join-Path $env:TEMP ([IO.Path]::GetFileName($msiUrl))
+  Write-Host "Baixando: $msiUrl" -ForegroundColor Cyan
+  Invoke-WebRequest -Uri $msiUrl -OutFile $dest -UseBasicParsing -ErrorAction Stop
+
+  Write-Host "Instalando PowerShell 7 (MSI silencioso)..." -ForegroundColor Cyan
+  $args = @("/i","`"$dest`"","/qn","/norestart","ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1","ENABLE_PSREMOTING=1","REGISTER_MANIFEST=1")
+  $p = Start-Process -FilePath "msiexec.exe" -ArgumentList $args -Wait -PassThru
+  if ($p.ExitCode -ne 0) { throw "Falha ao instalar PowerShell 7. ExitCode: $($p.ExitCode)" }
+
+  $new = Get-InstalledPwshVersion
+  Write-Host "PowerShell 7 instalado/atualizado para: $new" -ForegroundColor Green
+}
+
+function Set-OpenSshDefaultShell-Pwsh {
+  $pwsh = Get-InstalledPwsh
+  if (-not $pwsh) { throw "pwsh.exe não encontrado após instalação." }
+
+  $key = "HKLM:\SOFTWARE\OpenSSH"
+  if (-not (Test-Path $key)) { New-Item $key -Force | Out-Null }
+
+  # IMPORTANTE: valor com aspas por causa do 'Program Files'
+  $quoted = '"' + $pwsh + '"'
+  Set-ItemProperty -Path $key -Name DefaultShell -Value $quoted -Type String -Force
+  Write-Host "DefaultShell do OpenSSH → $quoted" -ForegroundColor Green
+
+  # Reinicia sshd
+  try {
+    if ((Get-Service sshd -ErrorAction Stop).Status -eq 'Running') {
+      Restart-Service sshd -Force
+    } else {
+      Start-Service sshd
+    }
+    Set-Service sshd -StartupType Automatic
+    Write-Host "sshd reiniciado." -ForegroundColor DarkGray
+  } catch {
+    Write-Warning "Não foi possível reiniciar o serviço sshd. Verifique se o OpenSSH Server está instalado."
+  }
+}
+
+function Enable-ProfileOverSsh {
+  # 1) ExecutionPolicy que permita perfis locais sem assinatura
+  try {
+    Set-ExecutionPolicy RemoteSigned -Scope LocalMachine -Force
+  } catch {
+    Write-Warning "Falha ao definir ExecutionPolicy em LocalMachine. Tentando em CurrentUser."
+    Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+  }
+
+  # 2) Criar e desbloquear perfis do PowerShell 7 para o usuário-alvo
+  #    Caminho padrão de perfil do PowerShell 7 (por usuário):
+  $userProfile = (Get-CimInstance Win32_UserProfile -ErrorAction SilentlyContinue |
+    Where-Object { $_.LocalPath -match "\\Users\\$([Regex]::Escape($UserName))$" } |
+    Select-Object -First 1).LocalPath
+  if (-not $userProfile) { $userProfile = "C:\Users\$UserName" }
+
+  $ps7ProfileDir = Join-Path $userProfile "Documents\PowerShell"
+  $ps7Profile    = Join-Path $ps7ProfileDir "Microsoft.PowerShell_profile.ps1"
+
+  New-Item -ItemType Directory -Path $ps7ProfileDir -Force | Out-Null
+  if (-not (Test-Path $ps7Profile)) {
+    New-Item -ItemType File -Path $ps7Profile -Force | Out-Null
+    Add-Content -Path $ps7Profile -Value "# Perfil do PowerShell 7 (SSH habilitado) - $(Get-Date)"
+  }
+
+  # Tornar o usuário dono e desbloquear o arquivo (remover marca da internet)
+  try { icacls $ps7Profile /setowner "$UserName" | Out-Null } catch {}
+  try { Unblock-File -LiteralPath $ps7Profile } catch {}
+
+  Write-Host "Perfil habilitado para o usuário '$UserName': $ps7Profile" -ForegroundColor Green
+}
+
+# === Execução das etapas ===
+Write-Host "# ===== Instalando/atualizando PowerShell 7 e habilitando perfil via SSH ====="
+Install-LatestPwsh
+Enable-ProfileOverSsh
+Set-OpenSshDefaultShell-Pwsh
+
 Write-Host "# ===== Aplicar e validar SSH====="
 Restart-Service sshd
 
