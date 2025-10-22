@@ -31,3 +31,14 @@
 
 - debug:
     msg: "✅ Mamba instalado com sucesso: {{ mamba_version.stdout }}"
+
+- name: Criar alias 'conda install' → 'mamba install'
+  ansible.windows.win_shell: |
+    Add-Content "$env:USERPROFILE\Documents\WindowsPowerShell\profile.ps1" `
+    "Set-Alias conda-install 'mamba install'";
+
+    Add-Content "$env:USERPROFILE\Documents\PowerShell\Microsoft.PowerShell_profile.ps1" `
+    "Set-Alias conda-install 'mamba install'"
+  args:
+    executable: powershell
+  ignore_errors: yes
