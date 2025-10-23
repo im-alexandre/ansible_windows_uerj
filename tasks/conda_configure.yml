@@ -7,7 +7,7 @@
 
 
 - name: Criar diretórios otimizados para cache e envs
-  ansible.windows.win_file:
+  win_file:
     path: "{{ item }}"
     state: directory
   loop:
@@ -22,7 +22,7 @@
 
 
 - name: Testar instalação do Mamba
-  ansible.windows.win_shell: |
+  win_shell: |
     & "{{ conda_exe }}" run -n base mamba --version
   args:
     executable: powershell
@@ -33,7 +33,7 @@
     msg: "✅ Mamba instalado com sucesso: {{ mamba_version.stdout }}"
 
 - name: Criar alias 'conda install' → 'mamba install'
-  ansible.windows.win_shell: |
+  win_shell: |
     Add-Content "$env:USERPROFILE\Documents\WindowsPowerShell\profile.ps1" `
     "Set-Alias conda-install 'mamba install'";
 
@@ -42,3 +42,7 @@
   args:
     executable: powershell
   ignore_errors: yes
+
+- name: Instalar bibliotecas módulos
+  win_shell: |
+    & "{{ conda_exe }}" install jedi-language-server "pygls<2.0" lsprotocol pynvim "platformdirs==4.2.2"

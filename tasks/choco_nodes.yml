@@ -67,18 +67,10 @@
     priority: 1
     bypass_proxy: yes
 
-- name: Copiar manifesto do controller -> local
-  win_shell: >
-    powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
-    "Copy-Item -Path '{{ unc_export }}\packages_with_params.json' -Destination '{{ local_export }}\packages_with_params.json' -Force -ErrorAction Stop"
-  register: copy_manifest
-  changed_when: true
-  failed_when: copy_manifest.rc not in [0]
-
 - name: Ler JSON do manifesto (local)
   win_shell: >
     powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
-    "Get-Content -Path '{{ local_export }}\packages_with_params.json' -Raw"
+    "Get-Content -Path '{{ unc_export }}\packages_with_params.json' -Raw"
   register: manifest_json
   changed_when: false
   failed_when: manifest_json.rc not in [0]

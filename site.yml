@@ -8,11 +8,11 @@
   tasks:
     - import_tasks: "tasks/wsl_install.yml"
 
-    - name: Reiniciar o host
-      win_reboot:
-        reboot_timeout: 600  # Tempo máximo de espera (em segundos) para o reinício
-        pre_reboot_delay: 60
-        test_command: whoami  # Comando para testar se a máquina está online após o reinício      win_reboot:
+    # - name: Reiniciar o host
+      # win_reboot:
+      #   reboot_timeout: 600  # Tempo máximo de espera (em segundos) para o reinício
+      #   pre_reboot_delay: 60
+      #   test_command: whoami  # Comando para testar se a máquina está online após o reinício      win_reboot:
   tags: wsl
 
 # =========================================================
@@ -64,17 +64,17 @@
   ignore_errors: true
   tags: [choco, packages, bootstrap]
 
-# =========================================================
-# PLAY 4: Iniciar o docker
-# =========================================================
-- name: Habilitar docker e iniciar postgresql
-  hosts: nodes
-  tasks:
-    - import_tasks: "tasks/docker_start.yml"
-    - win_reboot:
-  tags: docker
-  ignore_errors: true
-
+# # =========================================================
+# # PLAY 4: Iniciar o docker
+# # =========================================================
+# - name: Habilitar docker e iniciar postgresql
+#   hosts: nodes
+#   tasks:
+#     - import_tasks: "tasks/docker_start.yml"
+#     - win_reboot:
+#   tags: docker
+#   ignore_errors: true
+#
 
 # =========================================================
 # PLAY 4: Configurar o conda
