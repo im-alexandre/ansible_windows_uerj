@@ -1,15 +1,10 @@
-﻿anaconda3 /AddToPath /JustMe /D:d:\Anaconda3
+﻿anaconda3 /AddToPath /JustMe 
 git /GitAndUnixToolsOnPath /WindowsTerminal /NoAutoCrlf
 7zip
 7zip.install
 awscli
 chocolatey
-chocolatey-compatibility.extension
-chocolatey-core.extension
-chocolatey-dotnetfx.extension
-chocolatey-visualstudio.extension
-chocolatey-vscode.extension
-chocolatey-windowsupdate.extension
+google-chrome
 curl
 dbeaver
 docker
@@ -20,11 +15,6 @@ fd
 fzf
 gzip
 jasp
-KB2919355
-KB2919442
-KB2999226
-KB3033929
-KB3035131
 kind
 kubernetes-cli
 lazygit
