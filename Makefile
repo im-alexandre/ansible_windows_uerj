@@ -7,7 +7,6 @@ help:
 	@echo "  venv      - cria/atualiza .venv e instala requirements.txt"
 	@echo "  galaxy    - instala coleções/roles do requirements.yml"
 	@echo "  ping      - win_ping no grupo nodes"
-	@echo "  conda     - Configura o conda no computador. Primeiro instalar algo para aceitar termos
 	@echo "  graph     - imprime o grafo do inventário"
 	@echo "  deploy    - executa  (base + mysql)"
 	@echo "  packages  - instala apenas os pacotes em packages.txt"
@@ -30,13 +29,11 @@ graph:
 	. .env && . .venv/bin/activate && ansible-inventory --graph
 
 deploy:
-	. .env && . .venv/bin/activate && ansible-playbook site.yml --skip-tags conda
+	. .env && . .venv/bin/activate && ansible-playbook site.yml
 
 packages:
 	. .env && . .venv/bin/activate && ansible-playbook site.yml --tags packages,choco -vv
 
-conda:
-	. .env && . .venv/bin/activate && ansible-playbook site.yml --tags conda
 
 clean:
 	rm -rf .venv __pycache__
