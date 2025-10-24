@@ -1,46 +1,4 @@
 ---
-# =========================================================
-# PLAY 1: Instalar wsl
-# =========================================================
-- name: Instalar WSL e configurar o Ubuntu para Docker Desktop no Windows
-  gather_facts: yes
-  hosts: nodes
-  tasks:
-    - import_tasks: "tasks/wsl_install.yml"
-
-    # - name: Reiniciar o host
-      # win_reboot:
-      #   reboot_timeout: 600  # Tempo máximo de espera (em segundos) para o reinício
-      #   pre_reboot_delay: 60
-      #   test_command: whoami  # Comando para testar se a máquina está online após o reinício      win_reboot:
-  tags: wsl
-
-# =========================================================
-# PLAY 2: Instalar pacotes no controller e compartilha pacotes + manifesto
-# =========================================================
-- name: Preparar repositório/manifesto e compartilhar com usuário+senha
-  hosts: controller_win
-  gather_facts: no
-  collections:
-    - ansible.windows
-  vars:
-    # Caminhos no controller
-    repo_root:   'C:\ChocoRepo'
-    repo_export: 'C:\ChocoRepo\export'
-    repo_nupkg:  'C:\ChocoRepo\nupkg'
-    share_name:  'ChocoRepo'
-    choco_source_name:   "choco_repo"
-
-    # Credenciais do compartilhamento (usuario LOCAL do controller)
-    smb_user: "{{ lookup('env', 'SMB_USER') }}"
-    smb_pass: "{{ lookup('env', 'SMB_PASS') }}"
-  tasks:
-    - import_tasks: "tasks/choco_controller.yml"
-  tags: [choco, packages, bootstrap]
-
-# ======================
-# PLAY 3 — Instala pacotes nos nodes a partir do compartilhamento
-# ======================
 - name: Instalar pacotes nos nodes a partir do share do controller (com usuário/senha)
   hosts: nodes
   serial: 10
@@ -48,76 +6,31 @@
   collections:
     - ansible.windows
 
-  vars:
-          # AJUSTE para IP/nome do controller
-    share_name:          "ChocoRepo"
-    choco_source_name:   "choco_repo"
-    local_export:        "C:\\Windows\\Temp\\choco_export"
-    # Mesmas credenciais criadas no controller:
-    smb_user: "{{ lookup('env', 'SMB_USER') }}"
-    smb_pass: "{{ lookup('env', 'SMB_PASS') }}"
-    controller_smb_host: 192.168.0.139
-
   tasks:
     - import_tasks: "tasks/choco_bootstrap.yml"
-    - import_tasks: "tasks/choco_nodes.yml"
+    - import_tasks: "tasks/choco_packages.yml"
   ignore_errors: true
   tags: [choco, packages, bootstrap]
 
-# # =========================================================
-# # PLAY 4: Iniciar o docker
-# # =========================================================
-# - name: Habilitar docker e iniciar postgresql
-#   hosts: nodes
-#   tasks:
-#     - import_tasks: "tasks/docker_start.yml"
-#     - win_reboot:
-#   tags: docker
-#   ignore_errors: true
-#
-
-# =========================================================
-# PLAY 4: Configurar o conda
-# =========================================================
-- name: Configurar Anaconda com .condarc personalizado
+  # =========================================================
+  # PLAY 4: Configurar o conda
+  # =========================================================
+- name: Configurar Miniconda com .condarc personalizado
   hosts: nodes
   gather_facts: false
   vars:
-    conda_exe: "D:\\Anaconda3\\Scripts\\conda.exe"
-    conda_root: "D:\\conda"
-    conda_pkgs: "{{ conda_root }}\\conda_pkgs"
-    conda_envs: "{{ conda_root }}\\conda_envs"
-    condarc_dest: "{{ ansible_env.USERPROFILE }}\\.condarc"
-    condarc_content: |
-      # channel_priority: strict
+    # vars úteis (coloque onde preferir: group_vars/host_vars/vars:)
+    # -----------------------------------------------------------------------------
+    # Caminho do conda.exe do Miniconda “base”
+    # Diretórios otimizados (cache/envs)
+    conda_root: "D:\\tools\\mambaforge"
+    conda_envs: "D:\\tools\\mambaforge\\envs"
+    remove_meta_timeout_sec: 30
+    conda_pkgs: "D:\\tools\\mambaforge\\pkgs"
 
-      envs_dirs:
-        - {{ conda_envs }}
-
-      pkgs_dirs:
-        - {{ conda_pkgs }}
-
-      repodata_fns:
-        - current_repodata.json
-        - repodata.json
-
-      auto_activate_base: false
-      solver: libmamba
-
-      auto_update_conda: false
-      channels:
-        - conda-forge
-        - defaults
-
-      create_default_packages:
-        - jedi-language-server
-        - pygls<2.0 
-        - lsprotocol 
-        - pynvim
-        - pip
-        - platformdirs==4.2.2
   tasks:
     - import_tasks: "tasks/conda_configure.yml"
+  tags: [conda]
 
 - name: Configurar o neovim
   hosts: nodes
@@ -139,3 +52,4 @@
     - name: Exibir saída do clone/pull
       debug:
         var: resultado.stdout
+  tags: [neovim]

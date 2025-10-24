@@ -1,6 +1,5 @@
 ---
 # tasks/choco_bootstrap.yml
-
 - name: Verificar se choco está disponível
   win_command: choco -v
   register: choco_check

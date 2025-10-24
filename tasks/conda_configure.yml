@@ -1,48 +1,178 @@
----
-- name: Instalar o mamba
-  win_shell: |
-    & "{{ conda_exe }}" install -y -n base -c conda-forge mamba
-  register: install_mamba
-  changed_when: "'[y/N]' in install_mamba.stdout or 'Proceed' in install_mamba.stdout"
+# tasks/conda_configure.yml
+# Instala e configura o Miniconda via Chocolatey, fixa Python 3.12,
+# adiciona pacotes essenciais (Jupyter, pandas, numpy, etc.),
+# define envs_dirs e ativa o base automaticamente no PowerShell.
 
+# -------------------------------------------------------------------
+# Criar diretórios personalizados
+# -------------------------------------------------------------------
+- name: Instalar Miniconda com parâmetros corretos (Chocolatey)
+  win_chocolatey:
+    name: mambaforge
+    state: absent
 
-- name: Criar diretórios otimizados para cache e envs
+- name: Instalar Miniconda com parâmetros corretos (Chocolatey)
+  win_chocolatey:
+    name: mambaforge
+    state: present
+    # OBS: aspas duplas por fora, simples por dentro; use dois pontos nos params
+    params: "'/InstallationType:JustMe /AddToPath:1 /RegisterPython:1 /InstallDir:{{ conda_root }}'"
+
+- name: Garantir diretórios de envs e pkgs
   win_file:
     path: "{{ item }}"
     state: directory
   loop:
-    - "{{ conda_root }}"
     - "{{ conda_envs }}"
     - "{{ conda_pkgs }}"
 
-- name: Criar o arquivo .condarc no home do usuário
-  win_copy:
-    content: "{{ condarc_content }}"
-    dest: "{{ condarc_dest }}"
-
-
-- name: Testar instalação do Mamba
+# -------------------------------------------------------------------
+# .condarc e configuração padrão
+# -------------------------------------------------------------------
+- name: Configurar pacotes padrão ao criar ambientes
   win_shell: |
-    & "{{ conda_exe }}" run -n base mamba --version
+    conda config --add create_default_packages {{ item }}
+  loop:
+    - jedi-language-server
+    - lsprotocol
+    - pynvim
+    - pip
+  changed_when: true
+
+- name: Aplicar envs_dirs via conda config
+  win_shell: |
+    conda config --remove-key envs_dirs -q;
+    conda config --add envs_dirs "{{ conda_envs }}" -q
+  ignore_errors: yes
+
+- name: Definir solver do conda = libmamba
+  win_shell: 'conda config --set solver libmamba'
+  changed_when: true
+
+# -------------------------------------------------------------------
+# Atualizar base e instalar bibliotecas principais
+# -------------------------------------------------------------------
+
+# Instalação de libs conservadora (usa mamba se disponível)
+- name: Instalar bibliotecas (via mamba se disponível)
+  win_shell: |
+      conda install -n base -y jedi-language-server lsprotocol pynvim
+  register: libs_install
+
+# -------------------------------------------------------------------
+# PowerShell: conda init + auto_activate_base
+# -------------------------------------------------------------------
+- name: Inicializar conda no PowerShell
+  win_shell: 'conda init powershell'
   args:
     executable: powershell
-  register: mamba_version
+  changed_when: true
+
+- name: Ativar auto_activate_base
+  win_shell: 'conda config --set auto_activate_base true'
+  changed_when: true
+
+- name: Ativar auto_activate_base
+  win_shell: 'conda init'
+  changed_when: true
+
+# -------------------------------------------------------------------
+# Testes
+# -------------------------------------------------------------------
+- name: Verificar Python 3.12
+  win_shell: 'conda run -n base python -V'
+  register: py_ver
+  changed_when: false
+
+- name: Verificar JupyterLab
+  win_shell: 'conda run -n base jupyter-lab --version'
+  register: jl_ver
   changed_when: false
 
 - debug:
-    msg: "✅ Mamba instalado com sucesso: {{ mamba_version.stdout }}"
+    msg:
+      - "✅ Miniconda instalado em: {{ conda_root }}"
+      - "✅ Python base: {{ py_ver.stdout | trim }}"
+      - "✅ JupyterLab: {{ jl_ver.stdout | trim }}"
 
-- name: Criar alias 'conda install' → 'mamba install'
-  win_shell: |
-    Add-Content "$env:USERPROFILE\Documents\WindowsPowerShell\profile.ps1" `
-    "Set-Alias conda-install 'mamba install'";
 
-    Add-Content "$env:USERPROFILE\Documents\PowerShell\Microsoft.PowerShell_profile.ps1" `
-    "Set-Alias conda-install 'mamba install'"
-  args:
-    executable: powershell
-  ignore_errors: yes
+# -------------------------------------------------------------------
+# Configuração do diretório padrão do Jupyter Notebook
+# -------------------------------------------------------------------
+- name: Garantir diretório padrão dos notebooks
+  win_file:
+    path: "D:\\notebooks"
+    state: directory
 
-- name: Instalar bibliotecas módulos
-  win_shell: |
-    & "{{ conda_exe }}" install jedi-language-server "pygls<2.0" lsprotocol pynvim "platformdirs==4.2.2"
+- name: Criar diretório de configuração do Jupyter (se não existir)
+  win_file:
+    path: "C:\\Users\\{{ ansible_user }}\\.jupyter"
+    state: directory
+
+- name: Aplicar configuração do diretório padrão no jupyter_notebook_config.py
+  win_copy:
+    dest: "C:\\Users\\{{ ansible_user }}\\.jupyter\\jupyter_notebook_config.py"
+    content: |
+      c.NotebookApp.notebook_dir = r'D:\\notebooks'
+      c.NotebookApp.ip = '0.0.0.0'
+      c.NotebookApp.port = 8888
+    #
+# -------------------------------------------------------------------
+# Garantir permissões completas para o usuário no conda_root
+# -------------------------------------------------------------------
+
+# 1️⃣ Habilitar herança no diretório raiz do Miniconda/Miniconda
+- name: Garantir ACL no diretório raiz do Conda
+  win_acl:
+    path: "{{ conda_root }}"
+    user: "{{ ansible_user }}"
+    rights: FullControl
+    type: allow
+    inheritance: ContainerInherit, ObjectInherit
+    state: present
+
+# 2️⃣ Coletar subdiretórios imediatos
+- name: Listar subdiretórios imediatos do Conda
+  win_find:
+    paths: "{{ conda_root }}"
+    file_type: directory
+    recurse: no
+  register: conda_dirs
+
+# 3️⃣ Montar lista de caminhos (root + subdiretórios)
+- name: Montar lista de caminhos a aplicar ACL
+  set_fact:
+    acl_targets: "{{ [conda_root] + (conda_dirs.files | map(attribute='path') | list) }}"
+
+# 4️⃣ Aplicar ACL em paralelo
+- name: Aplicar ACLs em paralelo (FullControl)
+  win_acl:
+    path: "{{ item }}"
+    user: "{{ ansible_user }}"
+    rights: FullControl
+    type: allow
+    inheritance: ContainerInherit, ObjectInherit
+    state: present
+  loop: "{{ acl_targets }}"
+  async: 1800           # 30 minutos máx por job
+  poll: 0               # executa em paralelo
+  register: acl_jobs
+
+# 5️⃣ Aguardar conclusão de todos os jobs
+- name: Aguardar conclusão das ACLs
+  async_status:
+    jid: "{{ item.ansible_job_id }}"
+  register: acl_wait
+  until: acl_wait.finished
+  retries: 300          # 300 * 3s = 15 minutos máx
+  delay: 3
+  loop: "{{ acl_jobs.results }}"
+
+# 6️⃣ Validar se todas as ACLs foram aplicadas com sucesso
+- name: Validar resultado das ACLs
+  assert:
+    that:
+      - item.finished
+      - item.rc is not defined or item.rc == 0
+    fail_msg: "Falha ao aplicar ACL em {{ item.results.path | default('caminho desconhecido') }}"
+  loop: "{{ acl_wait.results }}"

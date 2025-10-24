@@ -1,0 +1,107 @@
+---
+# --- 1) Ler e transformar packages.txt (no host que executa o playbook) ---
+- name: Ler packages.txt
+  vars:
+    ansible_connection: local
+    ansible_shell_type: sh
+  delegate_to: local
+  run_once: true
+  ansible.builtin.slurp:
+    src: "files/packages.txt"
+  register: pkgs_file
+
+- name: Normalizar conteúdo
+  set_fact:
+    _pkgs_text: >-
+      {{ pkgs_file.content | b64decode
+          | regex_replace('^\uFEFF','')
+          | regex_replace('^\u00EF\u00BB\u00BF','')
+          | regex_replace('^"|"$','')
+          | regex_replace('\\\\r','')
+          | regex_replace('\\\\n','\n') }}
+
+- name: Linhas úteis
+  set_fact:
+    _lines: >-
+      {{ _pkgs_text.splitlines()
+          | map('trim')
+          | reject('equalto','')
+          | reject('match','^#')
+          | list }}
+
+- name: Inicializar listas
+  set_fact:
+    pkgs_ready: []
+    pkgs_manifest: []
+
+- name: Montar estrutura p/ win_chocolatey (name/version/pkg_args)
+  set_fact:
+    pkgs_ready: >-
+      {{ pkgs_ready + [ {
+          'name_only': name_ver[0],
+          'version':   ((name_ver | length) > 1) | ternary(name_ver[1], ''),
+          'pkg_args':  line_args
+        } ] }}
+  vars:
+    first_token: "{{ (item.split(' ', 1))[0] }}"
+    name_ver:    "{{ first_token.split('=', 1) }}"
+    line_args:   "{{ ((item.split(' ', 1) | length) > 1) | ternary((item.split(' ',1))[1], '') }}"
+  loop: "{{ _lines }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Construir manifesto (name/kind/args [+ versão opcional])
+  set_fact:
+    pkgs_manifest: |
+        {{ pkgs_manifest + [ {
+          'name': item.name_only,
+          'version': (item.version | trim | length > 0) | ternary(item.version, omit),
+          'kind': (item.pkg_args is search('--install-arguments')) | ternary('passthrough','params'),
+          'args': item.pkg_args | default('')
+        } ] }}
+  loop: "{{ pkgs_ready }}"
+  loop_control:
+    label: "{{ item.name_only }}"
+
+# --- 2) Preparar repositório no controller ---
+- name: Garantir diretórios no node
+  win_file:
+    path: "{{ ansible_remote_tmp }}"
+    state: directory
+
+- name: Salvar packages_with_params.json (manifesto)
+  win_copy:
+    dest: "{{ ansible_remote_tmp }}\\packages_with_params.json"
+    content: "{{ pkgs_manifest | to_nice_json }}"
+
+- name: Ler JSON do manifesto (local)
+  win_shell: >
+    powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
+    "Get-Content -Path '{{ ansible_remote_tmp }}\packages_with_params.json' -Raw"
+  register: manifest_json
+  changed_when: false
+  failed_when: manifest_json.rc not in [0]
+
+- name: Parse do manifesto
+  set_fact:
+    pkgs_from_manifest: "{{ manifest_json.stdout | from_json }}"
+
+- name: Instalar pacotes (via install_args)
+  win_chocolatey:
+    name: "{{ item.name }}"
+    state: present
+  loop: "{{ pkgs_from_manifest }}"
+  when: item.args == ''
+  loop_control:
+    label: "{{ item.name }} args {{ item.args }}"
+
+- name: Instalar pacotes (via params)
+  win_chocolatey:
+    name: "{{ item.name }}"
+    state: present
+    params: "{{ (item.args | trim | length > 0) | ternary(item.args, omit) }}"
+  loop: "{{ pkgs_from_manifest }}"
+  when: item.args != ''
+  loop_control:
+    label: "{{ item.name }} args {{ item.args }}"
+
