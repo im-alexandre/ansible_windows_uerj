@@ -105,3 +105,9 @@
   loop_control:
     label: "{{ item.name }} args {{ item.args }}"
 
+
+- name: Instalar treesitter (versão pinada)
+  win_chocolatey:
+    name: "tree-sitter"
+    state: present
+    version: '0.25.9'
