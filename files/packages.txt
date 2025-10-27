@@ -29,7 +29,6 @@ nodejs
 nodejs.install
 obs-studio
 obs-studio.install
-oh-my-posh
 pgadmin4
 psql
 r
