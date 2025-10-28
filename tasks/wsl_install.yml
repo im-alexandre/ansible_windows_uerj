@@ -22,12 +22,12 @@
 - name: Instalar o WSL
   win_shell: |
         Start-Process -FilePath "wsl.exe" -ArgumentList "--install" -Wait -Verb RunAs
-
+  changed_when: "Êxito na operação requisitada." in {{ std_out }}
 
 - name: Definir WSL2 como padrão
   win_shell: |
         Start-Process -FilePath "wsl.exe" -ArgumentList "-set-default-version 2" -Wait -Verb RunAs
-
+  changed_when: "A operação foi concluída com êxito." in {{ std_out }}
 
 - name: Instalar a distribuição Ubuntu
   win_shell: |
