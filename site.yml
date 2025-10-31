@@ -40,13 +40,11 @@
       win_shell: |
         $configDir = "$env:LOCALAPPDATA\nvim"
         if (!(Test-Path $configDir)) {
-          git clone https://github.com/alexandre07/nvim $configDir
+          git clone https://github.com/alexandre07/lazyvim_config $configDir
         } else {
           Set-Location $configDir
           git pull
         }
-      args:
-        executable: pwsh
       register: resultado
 
     - name: Exibir saída do clone/pull

@@ -62,18 +62,12 @@
 # -------------------------------------------------------------------
 # PowerShell: conda init + auto_activate_base
 # -------------------------------------------------------------------
-- name: Inicializar conda no PowerShell
-  win_shell: 'conda init powershell'
-  args:
-    executable: powershell
+- name: Ativar auto_activate_base
+  win_shell: 'conda init'
   changed_when: true
 
 - name: Ativar auto_activate_base
   win_shell: 'conda config --set auto_activate_base true'
-  changed_when: true
-
-- name: Ativar auto_activate_base
-  win_shell: 'conda init'
   changed_when: true
 
 # -------------------------------------------------------------------
