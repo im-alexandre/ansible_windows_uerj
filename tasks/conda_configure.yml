@@ -6,17 +6,16 @@
 # -------------------------------------------------------------------
 # Criar diretórios personalizados
 # -------------------------------------------------------------------
-- name: Instalar Miniconda com parâmetros corretos (Chocolatey)
-  win_chocolatey:
-    name: mambaforge
-    state: absent
-
-- name: Instalar Miniconda com parâmetros corretos (Chocolatey)
-  win_chocolatey:
-    name: mambaforge
-    state: present
-    # OBS: aspas duplas por fora, simples por dentro; use dois pontos nos params
-    params: "'/InstallationType:JustMe /AddToPath:1 /RegisterPython:1 /InstallDir:{{ conda_root }}'"
+# - name: Instalar Miniconda com parâmetros corretos (Chocolatey)
+#   win_chocolatey:
+#     name: miniforge3
+#     state: absent
+#   ignore_errors: true
+#
+# - name: Instalar Miniconda com parâmetros corretos (Chocolatey)
+#   win_chocolatey:
+#     name: miniforge3
+#     state: present
 
 - name: Garantir diretórios de envs e pkgs
   win_file:
@@ -54,9 +53,15 @@
 # -------------------------------------------------------------------
 
 # Instalação de libs conservadora (usa mamba se disponível)
+  #
 - name: Instalar bibliotecas (via mamba se disponível)
   win_shell: |
-      conda install -n base -y jedi-language-server lsprotocol pynvim
+      conda install -n base -y jupyterlab_widgets
+  register: libs_install
+
+- name: Instalar bibliotecas (via mamba se disponível)
+  win_shell: |
+      conda install -n base -y jedi-language-server lsprotocol pynvim jupyter numpy pandas
   register: libs_install
 
 # -------------------------------------------------------------------

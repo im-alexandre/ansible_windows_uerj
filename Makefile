@@ -8,7 +8,8 @@ help:
 	@echo "  galaxy    - instala coleções/roles do requirements.yml"
 	@echo "  ping      - win_ping no grupo nodes"
 	@echo "  graph     - imprime o grafo do inventário"
-	@echo "  deploy    - executa  (base + mysql)"
+	@echo "  deploy    - instala tudão de madureira"
+	@echo "  conda    - instala e configura o conda"
 	@echo "  packages  - instala apenas os pacotes em packages.txt"
 	@echo "  clean     - remove .venv e artefatos"
 
@@ -30,6 +31,9 @@ graph:
 
 deploy:
 	. .env && . .venv/bin/activate && ansible-playbook site.yml
+
+conda:
+	. .env && . .venv/bin/activate && ansible-playbook site.yml --tags conda
 
 packages:
 	. .env && . .venv/bin/activate && ansible-playbook site.yml --tags packages,choco -vv
