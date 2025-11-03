@@ -1,22 +1,24 @@
 # tasks/conda_configure.yml
-# Instala e configura o Miniconda via Chocolatey, fixa Python 3.12,
-# adiciona pacotes essenciais (Jupyter, pandas, numpy, etc.),
-# define envs_dirs e ativa o base automaticamente no PowerShell.
+# Instala miniforge3 (Chocolatey), configura conda (libmamba, channels),
+# fixa Python 3.12 no base, instala Jupyter Notebook/Lab e principais libs do Anaconda,
+# define envs_dirs/pkgs_dirs, auto_activate_base e diretório padrão do Jupyter.
+# Aplica ACLs completas no conda_root.
 
 # -------------------------------------------------------------------
-# Criar diretórios personalizados
+# 0) Instalar miniforge3 via Chocolatey (garantir um único root)
 # -------------------------------------------------------------------
-# - name: Instalar Miniconda com parâmetros corretos (Chocolatey)
-#   win_chocolatey:
-#     name: miniforge3
-#     state: absent
-#   ignore_errors: true
-#
-# - name: Instalar Miniconda com parâmetros corretos (Chocolatey)
-#   win_chocolatey:
-#     name: miniforge3
-#     state: present
+- name: Garantir miniforge3 instalado via Chocolatey
+  win_chocolatey:
+    name: miniforge3
+    state: present
 
+# Caminho do wrapper .bat (confiável no Windows)
+- set_fact:
+    conda_bat: "{{ conda_root }}\\condabin\\conda.bat"
+
+# -------------------------------------------------------------------
+# 1) Diretórios de envs e cache (envs_dirs e pkgs_dirs)
+# -------------------------------------------------------------------
 - name: Garantir diretórios de envs e pkgs
   win_file:
     path: "{{ item }}"
@@ -26,77 +28,120 @@
     - "{{ conda_pkgs }}"
 
 # -------------------------------------------------------------------
-# .condarc e configuração padrão
+# 2) Configuração do Conda (.condarc via conda config)
 # -------------------------------------------------------------------
-- name: Configurar pacotes padrão ao criar ambientes
+- name: Definir canal conda-forge e prioridade strict
   win_shell: |
-    conda config --add create_default_packages {{ item }}
-  loop:
-    - jedi-language-server
-    - lsprotocol
-    - pynvim
-    - pip
-  changed_when: true
+    {{ conda_bat }} config --remove-key channels -q || cmd /c exit 0
+    {{ conda_bat }} config --add channels conda-forge -q
+    {{ conda_bat }} config --set channel_priority strict
+  args:
+    executable: cmd
 
-- name: Aplicar envs_dirs via conda config
+- name: Aplicar envs_dirs e pkgs_dirs
   win_shell: |
-    conda config --remove-key envs_dirs -q;
-    conda config --add envs_dirs "{{ conda_envs }}" -q
-  ignore_errors: yes
+    {{ conda_bat }} config --remove-key envs_dirs -q || cmd /c exit 0
+    {{ conda_bat }} config --add envs_dirs "{{ conda_envs }}" -q
+    {{ conda_bat }} config --remove-key pkgs_dirs -q || cmd /c exit 0
+    {{ conda_bat }} config --add pkgs_dirs "{{ conda_pkgs }}" -q
+  args:
+    executable: cmd
 
-- name: Definir solver do conda = libmamba
-  win_shell: 'conda config --set solver libmamba'
-  changed_when: true
-
-# -------------------------------------------------------------------
-# Atualizar base e instalar bibliotecas principais
-# -------------------------------------------------------------------
-
-# Instalação de libs conservadora (usa mamba se disponível)
-  #
-- name: Instalar bibliotecas (via mamba se disponível)
+- name: Definir solver libmamba e auto_activate_base
   win_shell: |
-      conda install -n base -y jupyterlab_widgets
-  register: libs_install
+    {{ conda_bat }} config --set solver libmamba
+    {{ conda_bat }} config --set auto_activate_base true
+  args:
+    executable: cmd
 
-- name: Instalar bibliotecas (via mamba se disponível)
+# Pacotes padrão ao criar ambientes (úteis para você)
+- name: Configurar create_default_packages
   win_shell: |
-      conda install -n base -y jedi-language-server lsprotocol pynvim jupyter numpy pandas
-  register: libs_install
+    for %p in (jedi-language-server lsprotocol pynvim pip ipykernel ipywidgets) do {{ conda_bat }} config --add create_default_packages %p
+  args:
+    executable: cmd
 
 # -------------------------------------------------------------------
-# PowerShell: conda init + auto_activate_base
+# 3) Base: Python 3.12 + Jupyter + principais libs do Anaconda
 # -------------------------------------------------------------------
-- name: Ativar auto_activate_base
-  win_shell: 'conda init'
-  changed_when: true
+# Observação: usar o .bat evita o "conda-script.py" e garante PATH correto.
+# Lista de libs "clássicas" do Anaconda + seu set (ajuste à vontade).
+- set_fact:
+    base_libs: >-
+      python=3.12
+      jupyterlab
+      notebook
+      jupyterlab_widgets
+      ipywidgets
+      ipykernel
+      numpy
+      pandas
+      scipy
+      matplotlib
+      seaborn
+      scikit-learn
+      scikit-image
+      statsmodels
+      sympy
+      numba
+      networkx
+      pillow
+      requests
+      lxml
+      sqlalchemy
+      openpyxl
+      xlrd
+      pyarrow
 
-- name: Ativar auto_activate_base
-  win_shell: 'conda config --set auto_activate_base true'
-  changed_when: true
+- name: Instalar/atualizar base com principais bibliotecas
+  win_shell: |
+    {{ conda_bat }} install -n base -y {{ base_libs }}
+  args:
+    executable: cmd
+  register: base_install
+
+# (Opcional) limpeza de cache para evitar sobras/breaks
+- name: Limpar caches de pacotes (conda clean)
+  win_shell: |
+    {{ conda_bat }} clean -a -y
+  args:
+    executable: cmd
+  when: base_install is changed
 
 # -------------------------------------------------------------------
-# Testes
+# 4) conda init (PowerShell) para hook e auto-activate
 # -------------------------------------------------------------------
-- name: Verificar Python 3.12
-  win_shell: 'conda run -n base python -V'
+- name: Inicializar conda no PowerShell (hook no $PROFILE)
+  win_shell: |
+    {{ conda_bat }} init powershell
+  args:
+    executable: cmd
+
+# -------------------------------------------------------------------
+# 5) Testes rápidos
+# -------------------------------------------------------------------
+- name: Verificar Python 3.12 (base)
+  win_shell: '{{ conda_bat }} run -n base python -V'
   register: py_ver
   changed_when: false
+  args:
+    executable: cmd
 
 - name: Verificar JupyterLab
-  win_shell: 'conda run -n base jupyter-lab --version'
+  win_shell: '{{ conda_bat }} run -n base jupyter-lab --version'
   register: jl_ver
   changed_when: false
+  args:
+    executable: cmd
 
 - debug:
     msg:
-      - "✅ Miniconda instalado em: {{ conda_root }}"
+      - "✅ miniforge3 em: {{ conda_root }}"
       - "✅ Python base: {{ py_ver.stdout | trim }}"
       - "✅ JupyterLab: {{ jl_ver.stdout | trim }}"
 
-
 # -------------------------------------------------------------------
-# Configuração do diretório padrão do Jupyter Notebook
+# 6) Jupyter: diretório padrão e config
 # -------------------------------------------------------------------
 - name: Garantir diretório padrão dos notebooks
   win_file:
@@ -108,19 +153,19 @@
     path: "C:\\Users\\{{ ansible_user }}\\.jupyter"
     state: directory
 
-- name: Aplicar configuração do diretório padrão no jupyter_notebook_config.py
+# Compatível com JupyterLab/Notebook recentes (ServerApp)
+- name: Aplicar jupyter_notebook_config.py
   win_copy:
     dest: "C:\\Users\\{{ ansible_user }}\\.jupyter\\jupyter_notebook_config.py"
     content: |
-      c.NotebookApp.notebook_dir = r'D:\\notebooks'
-      c.NotebookApp.ip = '0.0.0.0'
-      c.NotebookApp.port = 8888
-    #
-# -------------------------------------------------------------------
-# Garantir permissões completas para o usuário no conda_root
-# -------------------------------------------------------------------
+      c.ServerApp.root_dir = r'D:\\notebooks'
+      c.ServerApp.ip = '0.0.0.0'
+      c.ServerApp.port = 8888
+      c.ServerApp.open_browser = False
 
-# 1️⃣ Habilitar herança no diretório raiz do Miniconda/Miniconda
+# -------------------------------------------------------------------
+# 7) Garantir permissões (ACL) no conda_root
+# -------------------------------------------------------------------
 - name: Garantir ACL no diretório raiz do Conda
   win_acl:
     path: "{{ conda_root }}"
@@ -130,7 +175,6 @@
     inheritance: ContainerInherit, ObjectInherit
     state: present
 
-# 2️⃣ Coletar subdiretórios imediatos
 - name: Listar subdiretórios imediatos do Conda
   win_find:
     paths: "{{ conda_root }}"
@@ -138,12 +182,10 @@
     recurse: no
   register: conda_dirs
 
-# 3️⃣ Montar lista de caminhos (root + subdiretórios)
 - name: Montar lista de caminhos a aplicar ACL
   set_fact:
     acl_targets: "{{ [conda_root] + (conda_dirs.files | map(attribute='path') | list) }}"
 
-# 4️⃣ Aplicar ACL em paralelo
 - name: Aplicar ACLs em paralelo (FullControl)
   win_acl:
     path: "{{ item }}"
@@ -153,21 +195,19 @@
     inheritance: ContainerInherit, ObjectInherit
     state: present
   loop: "{{ acl_targets }}"
-  async: 1800           # 30 minutos máx por job
-  poll: 0               # executa em paralelo
+  async: 1800
+  poll: 0
   register: acl_jobs
 
-# 5️⃣ Aguardar conclusão de todos os jobs
 - name: Aguardar conclusão das ACLs
   async_status:
     jid: "{{ item.ansible_job_id }}"
   register: acl_wait
   until: acl_wait.finished
-  retries: 300          # 300 * 3s = 15 minutos máx
+  retries: 300
   delay: 3
   loop: "{{ acl_jobs.results }}"
 
-# 6️⃣ Validar se todas as ACLs foram aplicadas com sucesso
 - name: Validar resultado das ACLs
   assert:
     that:
