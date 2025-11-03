@@ -19,19 +19,38 @@
   when: (feat_wsl.changed | default(false)) or (feat_vmp.changed | default(false))
 
 
+# -------------------------------------------------------------------
+# Instalar o WSL (bloqueante)
+# -------------------------------------------------------------------
 - name: Instalar o WSL
   win_shell: |
-        Start-Process -FilePath "wsl.exe" -ArgumentList "--install" -Wait -Verb RunAs
-  changed_when: "Êxito na operação requisitada." in {{ std_out }}
+    wsl --install
+  register: wsl_install
+  changed_when: "'Êxito na operação requisitada' in wsl_install.stdout or 'A operação foi concluída com êxito' in wsl_install.stdout"
+  failed_when: "'erro' in wsl_install.stdout.lower()"
+  args:
+    executable: cmd
 
+# -------------------------------------------------------------------
+# Definir WSL2 como padrão (bloqueante)
+# -------------------------------------------------------------------
 - name: Definir WSL2 como padrão
   win_shell: |
-        Start-Process -FilePath "wsl.exe" -ArgumentList "-set-default-version 2" -Wait -Verb RunAs
-  changed_when: "A operação foi concluída com êxito." in {{ std_out }}
+    wsl --set-default-version 2
+  register: wsl_default
+  changed_when: "'A operação foi concluída com êxito' in wsl_default.stdout"
+  failed_when: "'erro' in wsl_default.stdout.lower()"
+  args:
+    executable: cmd
 
 - name: Instalar a distribuição Ubuntu
   win_shell: |
-        Start-Process -FilePath "wsl.exe" -ArgumentList "--install -d Ubuntu" -Wait -Verb RunAs
+        wsl --install -d Ubuntu
+  register: ubuntu_default
+  changed_when: "'A operação foi concluída com êxito' in ubuntu_default.stdout"
+  failed_when: "'erro' in ubuntu_default.stdout.lower()"
+  args:
+    executable: cmd
 
 
 - name: Inicializar Ubuntu e executar comandos
